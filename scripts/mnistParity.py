@@ -32,10 +32,10 @@ class MNISTParityVertical(Dataset):
     
     def plotRandomData(self):
         """Plot random data from trainset with label as title"""
-        randomIdx = torch.randint(len(self.trainset.data), (1,)).item()
+        randomIdx = torch.randint(len(self.testset.data), (1,)).item()
         plt.axis("off")
-        plt.imshow(self.trainset.data[randomIdx].numpy(), cmap = "gray")
-        plt.title("Label {}".format(self.trainset.targets[randomIdx]))
+        plt.imshow(self.testset.data[randomIdx].numpy(), cmap = "gray")
+        plt.title("Label {}".format(self.testset.targets[randomIdx]))
         
         
 class MNISTParityHorizontal(Dataset):
@@ -77,7 +77,7 @@ class MNISTParityHorizontal(Dataset):
     
 	def plotRandomData(self):
 		"""Plot random data from trainset with label as title"""
-		randomIdx = torch.randint(len(self.trainset.data), (1,)).item()
+		randomIdx = torch.randint(len(self.testset.data), (1,)).item()
 		plt.axis("off")
-		plt.imshow(self.trainset.data[randomIdx].numpy(), cmap = "gray")
-		plt.title("Label {}".format(self.trainset.targets[randomIdx]))
+		plt.imshow(self.testset.data[randomIdx].numpy(), cmap = "gray")
+		plt.title("Label {}".format(self.testset.targets[randomIdx]))
