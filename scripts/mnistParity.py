@@ -22,7 +22,10 @@ class MNISTParityVertical(Dataset):
         self.testset.data = self.testset.data[:numTestSet-remainderTest].reshape(numTestSet // k, k * 28, 28)
 
         self.trainset.targets = self.trainset.targets[:numTrainSet-remainderTrain].reshape(numTrainSet // k, k).sum(axis=1) % 2
+        #self.trainset.targets[self.trainset.targets == 0] = -1
         self.testset.targets = self.testset.targets[:numTestSet-remainderTest].reshape(numTestSet // k, k).sum(axis=1) % 2
+        #self.testset.targets[self.testset.targets == 0] = -1 
+        
         
     def __len__(self):
         return len(self.trainset.data)
@@ -40,7 +43,7 @@ class MNISTParityVertical(Dataset):
         
 class MNISTParityHorizontal(Dataset):
  
-	def __init__(self, k, data_root = "datasets", transforms = None):
+	def __init__(self, k, data_root = "data", transforms = None):
     
 		# download and import the original MNIST data
 		self.trainset = datasets.MNIST(data_root, train=True, transform=transforms, download=True)
@@ -73,6 +76,7 @@ class MNISTParityHorizontal(Dataset):
 		numSet = len(targets)
 		remainder = numSet % k
 		labels = targets[:numSet-remainder].reshape(numSet // k, k).sum(axis=1) % 2
+		#labels[labels == 0] = -1
 		return labels
     
 	def plotRandomData(self):
