@@ -2,7 +2,7 @@ import torch
 import os
 from .train_utils import AverageMeter, accuracy
 
-def train_epoch(model, dataloader, loss_fn, optimizer, loss_meter, performance_meter, performance, device):
+def train_epoch(model, dataloader, loss_fn, optimizer, loss_meter, performance_meter, performance, device, lr_scheduler):
     for X, y in dataloader:
         X = X.to(device)
         y = y.to(device)
@@ -18,13 +18,16 @@ def train_epoch(model, dataloader, loss_fn, optimizer, loss_meter, performance_m
         loss.backward()
         # 5. update the value of the params
         optimizer.step()
+        if lr_scheduler is not None:
+            lr_scheduler.step()
         # 6. calculate the accuracy for this mini-batch
         acc = performance(y_hat, y)
         # 7. update the loss and accuracy AverageMeter
         loss_meter.update(val=loss.item(), n=X.shape[0])
         performance_meter.update(val=acc, n=X.shape[0])
 
-def train_model(model, trainDataloader, testDataLoader, loss_fn, optimizer, num_epochs, validate_model = False, performance=accuracy, device=None):
+def train_model(model, trainDataloader, testDataLoader, loss_fn, optimizer, num_epochs, validate_model = False, performance=accuracy, device=None, lr_scheduler=None, 
+                lr_scheduler_step_on_epoch=True):
 
     if device is None:
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -44,7 +47,10 @@ def train_model(model, trainDataloader, testDataLoader, loss_fn, optimizer, num_
         loss_meter = AverageMeter()
         performance_meter = AverageMeter()
 
-        train_epoch(model, trainDataloader, loss_fn, optimizer, loss_meter, performance_meter, performance, device)
+        if lr_scheduler != None: print(f"Epoch {epoch+1} --- learning rate {optimizer.param_groups[0]['lr']:.5f}")
+        lr_scheduler_batch = lr_scheduler if not lr_scheduler_step_on_epoch else None
+
+        train_epoch(model, trainDataloader, loss_fn, optimizer, loss_meter, performance_meter, performance, device, lr_scheduler_batch)
 
         print(f"Epoch {epoch+1} completed. Loss - total: {loss_meter.sum:.4f} - average: {loss_meter.avg:.4f}; Performance: {performance_meter.avg:.4f}")
         trainLostList.append(loss_meter.sum)
@@ -54,6 +60,12 @@ def train_model(model, trainDataloader, testDataLoader, loss_fn, optimizer, num_
             val_loss, val_perf = test_model(model, testDataLoader, performance=accuracy, loss_fn = loss_fn, device = "cuda:0")
             valLossList.append(val_loss)
             valAccList.append(val_perf)
+
+        if lr_scheduler is not None and lr_scheduler_step_on_epoch:
+            if isinstance(lr_scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                lr_scheduler.step(loss_meter.avg)
+            else:
+                lr_scheduler.step()
 
     return trainLostList, trainAccList, valLossList, valAccList
 
