@@ -23,17 +23,6 @@ def accuracy(nn_output: Tensor, ground_truth: Tensor, k: int=1):
     return acc
     
     
-def accuracy2(y_hat, y):
-    '''
-    y_hat is the model output - a Tensor of shape (n x num_classes)
-    y is the ground truth
-
-    '''
-    classes_prediction = y_hat.argmax(dim=1)
-    match_ground_truth = classes_prediction == y # -> tensor of booleans
-    correct_matches = match_ground_truth.sum()
-    return (correct_matches / y_hat.shape[0]).item()
-
 class AverageMeter(object):
     '''
     a generic class to keep track of performance metrics during training or testing of models

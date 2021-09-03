@@ -1,9 +1,11 @@
 import torch
-import os
+import numpy as np
 from .train_utils import AverageMeter, accuracy
+from .mnistParity import MNISTParity
 
-def train_epoch(model, dataloader, loss_fn, optimizer, loss_meter, performance_meter, performance, device, lr_scheduler):
-    for X, y in dataloader:
+def train_epoch(model, trainLoader, loss_fn, optimizer, loss_meter, performance_meter, performance, device, lr_scheduler):
+    
+    for X, y in trainLoader:
         X = X.to(device)
         y = y.to(device)
         # 1. reset the gradients previously accumulated by the optimizer
@@ -25,8 +27,9 @@ def train_epoch(model, dataloader, loss_fn, optimizer, loss_meter, performance_m
         # 7. update the loss and accuracy AverageMeter
         loss_meter.update(val=loss.item(), n=X.shape[0])
         performance_meter.update(val=acc, n=X.shape[0])
-
-def train_model(model, trainDataloader, testDataLoader, loss_fn, optimizer, num_epochs, validate_model = False, performance=accuracy, device=None, lr_scheduler=None, 
+        
+        
+def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, batch_size, validate_model = False, performance=accuracy, device=None, lr_scheduler=None, 
                 lr_scheduler_step_on_epoch=True):
 
     if device is None:
@@ -43,21 +46,22 @@ def train_model(model, trainDataloader, testDataLoader, loss_fn, optimizer, num_
 
     # epoch loop
     for epoch in range(num_epochs):
-
+        trainData = MNISTParity(trainset, k, batch_size)
         loss_meter = AverageMeter()
         performance_meter = AverageMeter()
 
         if lr_scheduler != None: print(f"Epoch {epoch+1} --- learning rate {optimizer.param_groups[0]['lr']:.5f}")
         lr_scheduler_batch = lr_scheduler if not lr_scheduler_step_on_epoch else None
 
-        train_epoch(model, trainDataloader, loss_fn, optimizer, loss_meter, performance_meter, performance, device, lr_scheduler_batch)
+        train_epoch(model, trainData.loader, loss_fn, optimizer, loss_meter, performance_meter, performance, device, lr_scheduler_batch)
 
         print(f"Epoch {epoch+1} completed. Loss - total: {loss_meter.sum:.4f} - average: {loss_meter.avg:.4f}; Performance: {performance_meter.avg:.4f}")
         trainLostList.append(loss_meter.sum)
         trainAccList.append(performance_meter.avg)
 
         if validate_model == True:
-            val_loss, val_perf = test_model(model, testDataLoader, performance=accuracy, loss_fn = loss_fn, device = "cuda:0")
+            testData = MNISTParity(testset, k, batch_size)
+            val_loss, val_perf = test_model(model, k,testset, batch_size, performance=accuracy, loss_fn = loss_fn, device = "cuda:0")
             valLossList.append(val_loss)
             valAccList.append(val_perf)
 
@@ -69,8 +73,8 @@ def train_model(model, trainDataloader, testDataLoader, loss_fn, optimizer, num_
 
     return trainLostList, trainAccList, valLossList, valAccList
 
-def test_model(model, dataloader, performance=accuracy, loss_fn=None, device=None):
-
+def test_model(model, k, testset, batch_size, performance=accuracy, loss_fn=None, device=None):
+    
     if device is None:
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
         
@@ -82,7 +86,8 @@ def test_model(model, dataloader, performance=accuracy, loss_fn=None, device=Non
     model = model.to(device)
     model.eval()
     with torch.no_grad():
-        for X, y in dataloader:
+        testData = MNISTParity(testset, k, batch_size)
+        for X, y in testData.loader:
             X = X.to(device)
             y = y.to(device)
             
@@ -97,4 +102,3 @@ def test_model(model, dataloader, performance=accuracy, loss_fn=None, device=Non
     fin_perf = performance_meter.avg
     print(f"TESTING - loss {fin_loss if fin_loss is not None else '--'} - performance {fin_perf:.4f}")
     return fin_loss, fin_perf
-

@@ -1,7 +1,8 @@
-import os
+import numpy as np
 import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import Dataset
+from torch.utils.data import TensorDataset
 import torchvision.datasets as datasets
 
 class MNISTParityVertical(Dataset):
@@ -85,3 +86,37 @@ class MNISTParityHorizontal(Dataset):
 		plt.axis("off")
 		plt.imshow(self.testset.data[randomIdx].numpy(), cmap = "gray")
 		plt.title("Label {}".format(self.testset.targets[randomIdx]))
+		
+# This is the best version, other methods reduce the number fo datapoints, by using only existing ones
+# whereas this class sample from dataset and it's re-created for each epoch
+class MNISTParity:
+    def __init__(self, dataset, k = 1, batch_size = 128):
+        self.k = k
+        
+        left = np.random.permutation(dataset.data.shape[0])
+        right = np.random.permutation(dataset.data.shape[0])
+        middle = np.random.permutation(dataset.data.shape[0])
+        
+        if k == 2:
+            self.data =torch.Tensor( np.concatenate(( dataset.data[left],  dataset.data[right]), axis=2)).float()
+            self.targets = ((dataset.targets[l] + dataset.targets[r]) %2)
+            
+        elif k == 3:
+            self.data =torch.Tensor( np.concatenate(( dataset.data[left], dataset.data[middle],  dataset.data[right]), axis=2)).float()                   
+            self.targets = ((dataset.targets[left] + dataset.targets[middle] + dataset.targets[right]) %2)
+            
+        else:
+            self.data = dataset.data.float()
+            self.targets = dataset.targets % 2
+            
+            
+        self.loader = torch.utils.data.DataLoader(TensorDataset(self.data, self.targets), batch_size=batch_size,
+                                          shuffle=False, num_workers=4)
+        
+        
+    def plotRandomData(self):
+        """Plot random data from trainset with label as title"""
+        randomIdx = torch.randint(len(self.data), (1,)).item()
+        plt.axis("off")
+        plt.imshow(self.data[randomIdx].numpy(), cmap = "gray")
+        plt.title("Label {}".format(self.targets[randomIdx]))
