@@ -91,27 +91,30 @@ class MNISTParityHorizontal(Dataset):
 # whereas this class sample from dataset and it's re-created for each epoch
 class MNISTParity:
     def __init__(self, dataset, k = 1, batch_size = 128):
+
         self.k = k
-        
+        # indexes to sample from MNIST data
         left = np.random.permutation(dataset.data.shape[0])
         right = np.random.permutation(dataset.data.shape[0])
         middle = np.random.permutation(dataset.data.shape[0])
         
+        # concatenate them to have horizontaly stacked images
         if k == 2:
             self.data =torch.Tensor( np.concatenate(( dataset.data[left],  dataset.data[right]), axis=2)).float()
-            self.targets = ((dataset.targets[l] + dataset.targets[r]) %2)
+            self.targets = ((dataset.targets[left] + dataset.targets[right]) %2)
             
         elif k == 3:
             self.data =torch.Tensor( np.concatenate(( dataset.data[left], dataset.data[middle],  dataset.data[right]), axis=2)).float()                   
             self.targets = ((dataset.targets[left] + dataset.targets[middle] + dataset.targets[right]) %2)
-            
+
+        # k = 1    
         else:
             self.data = dataset.data.float()
             self.targets = dataset.targets % 2
             
             
         self.loader = torch.utils.data.DataLoader(TensorDataset(self.data, self.targets), batch_size=batch_size,
-                                          shuffle=False, num_workers=4)
+                                          shuffle=True)
         
         
     def plotRandomData(self):

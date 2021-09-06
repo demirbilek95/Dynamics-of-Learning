@@ -60,8 +60,8 @@ def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, bat
         trainAccList.append(performance_meter.avg)
 
         if validate_model == True:
-            testData = MNISTParity(testset, k, batch_size)
-            val_loss, val_perf = test_model(model, k,testset, batch_size, performance=accuracy, loss_fn = loss_fn, device = "cuda:0")
+            testData = MNISTParity(testset, k, 1000)
+            val_loss, val_perf = test_model(model, k,testData.loader, performance=accuracy, loss_fn = loss_fn, device = "cuda:0")
             valLossList.append(val_loss)
             valAccList.append(val_perf)
 
@@ -73,7 +73,7 @@ def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, bat
 
     return trainLostList, trainAccList, valLossList, valAccList
 
-def test_model(model, k, testset, batch_size, performance=accuracy, loss_fn=None, device=None):
+def test_model(model, k, testLoader, performance=accuracy, loss_fn=None, device=None):
     
     if device is None:
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -86,8 +86,7 @@ def test_model(model, k, testset, batch_size, performance=accuracy, loss_fn=None
     model = model.to(device)
     model.eval()
     with torch.no_grad():
-        testData = MNISTParity(testset, k, batch_size)
-        for X, y in testData.loader:
+        for X, y in testLoader:
             X = X.to(device)
             y = y.to(device)
             
