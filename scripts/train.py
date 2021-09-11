@@ -44,7 +44,8 @@ def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, bat
     valLossList = []
     valAccList = [] 
 
-    # epoch loop
+    #trainData = MNISTParity(trainset, k, batch_size)
+    #testData = MNISTParity(testset, k, 1000)
     for epoch in range(num_epochs):
         trainData = MNISTParity(trainset, k, batch_size)
         loss_meter = AverageMeter()
@@ -73,6 +74,8 @@ def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, bat
 
     return trainLostList, trainAccList, valLossList, valAccList
 
+
+    
 def test_model(model, k, testLoader, performance=accuracy, loss_fn=None, device=None):
     
     if device is None:
