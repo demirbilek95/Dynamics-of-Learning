@@ -27,10 +27,33 @@ def train_epoch(model, trainLoader, loss_fn, optimizer, loss_meter, performance_
         # 7. update the loss and accuracy AverageMeter
         loss_meter.update(val=loss.item(), n=X.shape[0])
         performance_meter.update(val=acc, n=X.shape[0])
+
+
+def train_epoch_manually(model, trainLoader, loss_fn, optimizer, loss_meter, performance_meter, performance, device, lr, lr_scheduler):
+    for X, y in trainLoader:
+        X = X.to(device)
+        y = y.to(device)
+        optimizer.zero_grad()
+        y_hat = model(X)
+        loss = loss_fn(y_hat, y)
+        loss.backward() # Check this one, and google how to change caculations of gradients in pytorch or do it manually
+        # first do it for BP, later replace W^T with random matrice B
+        # update the weigts manually here (vanilla SGD)
+        with torch.no_grad():
+            for param in model.parameters():
+                if param.grad is not None:
+                    param -= lr * param.grad
+
+        if lr_scheduler is not None:
+            lr_scheduler.step()
+
+        acc = performance(y_hat, y)
+        loss_meter.update(val=loss.item(), n=X.shape[0])
+        performance_meter.update(val=acc, n=X.shape[0])
         
         
-def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, batch_size, validate_model = False, performance=accuracy, device=None, lr_scheduler=None, 
-                lr_scheduler_step_on_epoch=True):
+def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, batch_size, validate_model = False, performance=accuracy, device=None, lr = None, lr_scheduler=None, 
+                lr_scheduler_step_on_epoch=True, updateWManually = False):
 
     if device is None:
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -54,7 +77,11 @@ def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, bat
         if lr_scheduler != None: print(f"Epoch {epoch+1} --- learning rate {optimizer.param_groups[0]['lr']:.5f}")
         lr_scheduler_batch = lr_scheduler if not lr_scheduler_step_on_epoch else None
 
-        train_epoch(model, trainData.loader, loss_fn, optimizer, loss_meter, performance_meter, performance, device, lr_scheduler_batch)
+        if updateWManually:
+            train_epoch_manually(model, trainData.loader, loss_fn, optimizer, loss_meter, performance_meter, performance, device, lr, lr_scheduler_batch)
+
+        else:
+            train_epoch(model, trainData.loader, loss_fn, optimizer, loss_meter, performance_meter, performance, device, lr_scheduler_batch)
 
         print(f"Epoch {epoch+1} completed. Loss - total: {loss_meter.sum:.4f} - average: {loss_meter.avg:.4f}; Performance: {performance_meter.avg:.4f}")
         trainLostList.append(loss_meter.sum)
