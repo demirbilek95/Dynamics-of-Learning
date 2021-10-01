@@ -1,16 +1,16 @@
 import torch
-import numpy as np
-from .train_utils import AverageMeter, accuracy
+from .train_utils import AverageMeter, accuracy, accuracy_manual
 from .mnistParity import MNISTParity
 
-def train_epoch(model, trainLoader, loss_fn, optimizer, loss_meter, performance_meter, performance, device, lr_scheduler):
-    
+
+def train_epoch(model, trainLoader, loss_fn, optimizer, loss_meter, performance_meter, performance, device,
+                lr_scheduler):
     for X, y in trainLoader:
         X = X.to(device)
         y = y.to(device)
         # 1. reset the gradients previously accumulated by the optimizer
         #    this will avoid re-using gradients from previous loops
-        optimizer.zero_grad() 
+        optimizer.zero_grad()
         # 2. get the predictions from the current state of the model
         #    this is the forward pass
         y_hat = model(X)
@@ -29,16 +29,16 @@ def train_epoch(model, trainLoader, loss_fn, optimizer, loss_meter, performance_
         performance_meter.update(val=acc, n=X.shape[0])
 
 
-def train_epoch_manually(model, trainLoader, loss_fn, optimizer, loss_meter, performance_meter, performance, device, lr, lr_scheduler):
+def train_epoch_weights_manually(model, trainLoader, loss_fn, optimizer, loss_meter, performance_meter, performance,
+                                 device, lr, lr_scheduler):
     for X, y in trainLoader:
         X = X.to(device)
         y = y.to(device)
         optimizer.zero_grad()
         y_hat = model(X)
         loss = loss_fn(y_hat, y)
-        loss.backward() # Check this one, and google how to change caculations of gradients in pytorch or do it manually
-        # first do it for BP, later replace W^T with random matrice B
-        # update the weigts manually here (vanilla SGD)
+        loss.backward()
+        # update the weights manually here (vanilla SGD)
         with torch.no_grad():
             for param in model.parameters():
                 if param.grad is not None:
@@ -50,22 +50,41 @@ def train_epoch_manually(model, trainLoader, loss_fn, optimizer, loss_meter, per
         acc = performance(y_hat, y)
         loss_meter.update(val=loss.item(), n=X.shape[0])
         performance_meter.update(val=acc, n=X.shape[0])
-        
-        
-def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, batch_size, validate_model = False, performance=accuracy, device=None, lr = None, lr_scheduler=None, 
-                lr_scheduler_step_on_epoch=True, updateWManually = False):
+
+
+def train_epoch_manually(model, trainLoader, loss_meter, performance_meter, device, loss_fn=None,
+                         loss_type="Cross Entropy"):
+
+    for X, y in trainLoader:
+        X = X.to(device)
+        y = y.to(device)
+        y_hat = model(X)
+        if loss_type == "Cross Entropy":
+            loss = torch.nn.functional.cross_entropy(y_hat, y)
+        else:
+            loss = loss_fn(y_hat, y.reshape(len(y), 1).float())
+
+        acc = accuracy_manual(y_hat, y, loss_type)
+        loss_meter.update(val=loss, n=X.shape[0])
+        performance_meter.update(val=acc, n=X.shape[0])
+        model.train(X, y)
+
+
+def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, batch_size, validate_model=False,
+                performance=accuracy, device=None, lr=None, lr_scheduler=None, lr_scheduler_step_on_epoch=True,
+                updateWManually=False):
 
     if device is None:
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
     print(f"Training on {device}")
-    
+
     model = model.to(device)
     model.train()
-    
+
     trainLostList = []
     trainAccList = []
     valLossList = []
-    valAccList = [] 
+    valAccList = []
 
     #trainData = MNISTParity(trainset, k, batch_size)
     #testData = MNISTParity(testset, k, 1000)
@@ -74,22 +93,26 @@ def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, bat
         loss_meter = AverageMeter()
         performance_meter = AverageMeter()
 
-        if lr_scheduler != None: print(f"Epoch {epoch+1} --- learning rate {optimizer.param_groups[0]['lr']:.5f}")
+        if lr_scheduler is not None:
+            print(f"Epoch {epoch+1} --- learning rate {optimizer.param_groups[0]['lr']:.5f}")
         lr_scheduler_batch = lr_scheduler if not lr_scheduler_step_on_epoch else None
 
         if updateWManually:
-            train_epoch_manually(model, trainData.loader, loss_fn, optimizer, loss_meter, performance_meter, performance, device, lr, lr_scheduler_batch)
-
+            train_epoch_weights_manually(model, trainData.loader, loss_fn, optimizer, loss_meter, performance_meter,
+                                         performance, device, lr, lr_scheduler_batch)
         else:
-            train_epoch(model, trainData.loader, loss_fn, optimizer, loss_meter, performance_meter, performance, device, lr_scheduler_batch)
+            train_epoch(model, trainData.loader, loss_fn, optimizer, loss_meter, performance_meter,
+                        performance, device, lr_scheduler_batch)
 
-        print(f"Epoch {epoch+1} completed. Loss - total: {loss_meter.sum:.4f} - average: {loss_meter.avg:.4f}; Performance: {performance_meter.avg:.4f}")
+        print(f"Epoch {epoch+1} completed. Loss - total: {loss_meter.sum:.4f} - average: {loss_meter.avg:.4f}; "
+              f"Performance: {performance_meter.avg:.4f}")
         trainLostList.append(loss_meter.sum)
         trainAccList.append(performance_meter.avg)
 
-        if validate_model == True:
+        if validate_model is True:
             testData = MNISTParity(testset, k, 1000)
-            val_loss, val_perf = test_model(model, k,testData.loader, performance=accuracy, loss_fn = loss_fn, device = "cuda:0")
+            val_loss, val_perf = test_model(model, testData.loader, loss_fn=loss_fn,
+                                            device=device)
             valLossList.append(val_loss)
             valAccList.append(val_perf)
 
@@ -102,15 +125,44 @@ def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, bat
     return trainLostList, trainAccList, valLossList, valAccList
 
 
-    
-def test_model(model, k, testLoader, performance=accuracy, loss_fn=None, device=None):
-    
+def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_epochs, batch_size,
+                         validate_model=False, device=None):
+
+    model = model.to(device)
+    trainLostList = []
+    trainAccList = []
+    valLossList = []
+    valAccList = []
+
+    for epoch in range(num_epochs):
+        trainData = MNISTParity(trainset, k, batch_size)
+        loss_meter = AverageMeter()
+        performance_meter = AverageMeter()
+
+        train_epoch_manually(model, trainData.loader, loss_meter, performance_meter, device, loss_type)
+        print(f"Epoch {epoch+1} completed. Loss - total: {loss_meter.sum:.4f} - average: {loss_meter.avg:.4f}; Performance: {performance_meter.avg:.4f}")
+        trainLostList.append(loss_meter.sum)
+        trainAccList.append(performance_meter.avg)
+
+        if validate_model is True:
+            testData = MNISTParity(testset, k, 1000)
+            val_loss, val_perf = test_model_manually(model, testData.loader, performance=accuracy,
+                                                     loss_fn=loss_fn, device=device)
+            valLossList.append(val_loss)
+            valAccList.append(val_perf)
+
+    return trainLostList, trainAccList, valLossList, valAccList
+
+
+def test_model(model, testLoader, performance=accuracy, loss_fn=None, device=None):
+
     if device is None:
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
-        
+
+    loss_meter = None
     if loss_fn is not None:
         loss_meter = AverageMeter()
-        
+
     performance_meter = AverageMeter()
 
     model = model.to(device)
@@ -119,13 +171,39 @@ def test_model(model, k, testLoader, performance=accuracy, loss_fn=None, device=
         for X, y in testLoader:
             X = X.to(device)
             y = y.to(device)
-            
+
             y_hat = model(X)
             loss = loss_fn(y_hat, y) if loss_fn is not None else None
             acc = performance(y_hat, y)
             if loss_fn is not None:
                 loss_meter.update(loss.item(), X.shape[0])
             performance_meter.update(acc, X.shape[0])
+    # get final performances
+    fin_loss = loss_meter.sum if loss_fn is not None else None
+    fin_perf = performance_meter.avg
+    print(f"TESTING - loss {fin_loss if fin_loss is not None else '--'} - performance {fin_perf:.4f}")
+    return fin_loss, fin_perf
+
+
+def test_model_manually(model, testLoader, device, performance=accuracy,  loss_type="Cross Entropy", loss_fn=None):
+    loss_meter = None
+    if loss_fn is not None:
+        loss_meter = AverageMeter()
+    performance_meter = AverageMeter()
+    model = model.to(device)
+    for X, y in testLoader:
+        X = X.to(device)
+        y = y.to(device)
+        y_hat = model(X)
+
+        if loss_type == "Cross Entropy":
+            loss = torch.nn.functional.cross_entropy(y_hat, y)
+        else:
+            loss = loss_fn(y_hat, y.reshape(len(y), 1).float())
+        acc = performance(y_hat, y)
+        if loss_fn is not None:
+            loss_meter.update(loss.item(), X.shape[0])
+        performance_meter.update(acc, X.shape[0])
     # get final performances
     fin_loss = loss_meter.sum if loss_fn is not None else None
     fin_perf = performance_meter.avg
