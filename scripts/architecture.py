@@ -12,7 +12,7 @@ class MLP(torch.nn.Module):
             self.layerEx = torch.nn.Linear(784*k,512)
 
         self.layer1 = torch.nn.Linear(784 * k, 512)
-        self.layer2 = torch.nn.Linear(512, 2) 
+        self.layer2 = torch.nn.Linear(512, 1) 
 
         if "Gaussian" in activation:
             self.layer1.weight.data.normal_(0,np.sqrt(6 / float(784*k + 512)))

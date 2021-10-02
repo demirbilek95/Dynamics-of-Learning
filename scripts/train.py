@@ -15,7 +15,8 @@ def train_epoch(model, trainLoader, loss_fn, optimizer, loss_meter, performance_
         #    this is the forward pass
         y_hat = model(X)
         # 3. calculate the loss on the current mini-batch
-        loss = loss_fn(y_hat, y)
+        #loss = loss_fn(y_hat, y)
+        loss = loss_fn(y_hat, y.reshape(len(y), 1).float())
         # 4. execute the backward pass given the current loss
         loss.backward()
         # 5. update the value of the params
@@ -23,7 +24,7 @@ def train_epoch(model, trainLoader, loss_fn, optimizer, loss_meter, performance_
         if lr_scheduler is not None:
             lr_scheduler.step()
         # 6. calculate the accuracy for this mini-batch
-        acc = performance(y_hat, y)
+        acc = performance(y_hat, y, "BCE")
         # 7. update the loss and accuracy AverageMeter
         loss_meter.update(val=loss.item(), n=X.shape[0])
         performance_meter.update(val=acc, n=X.shape[0])
@@ -72,7 +73,7 @@ def train_epoch_manually(model, trainLoader, loss_meter, performance_meter, devi
 
 
 def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, batch_size, validate_model=False,
-                performance=accuracy, device=None, lr=None, lr_scheduler=None, lr_scheduler_step_on_epoch=True,
+                performance=accuracy_manual, device=None, lr=None, lr_scheduler=None, lr_scheduler_step_on_epoch=True,
                 updateWManually=False):
 
     if device is None:
@@ -155,7 +156,7 @@ def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_ep
     return trainLostList, trainAccList, valLossList, valAccList
 
 
-def test_model(model, testLoader, performance=accuracy, loss_fn=None, device=None):
+def test_model(model, testLoader, performance=accuracy_manual, loss_fn=None, device=None):
 
     if device is None:
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -172,8 +173,9 @@ def test_model(model, testLoader, performance=accuracy, loss_fn=None, device=Non
             X = X.to(device)
             y = y.to(device)
             y_hat = model(X)
-            loss = loss_fn(y_hat, y) if loss_fn is not None else None
-            acc = performance(y_hat, y)
+            loss = loss_fn(y_hat, y.reshape(len(y), 1).float())
+            #loss = loss_fn(y_hat, y) if loss_fn is not None else None
+            acc = performance(y_hat, y, "BCE")
             if loss_fn is not None:
                 loss_meter.update(loss.item(), X.shape[0])
             performance_meter.update(acc, X.shape[0])
