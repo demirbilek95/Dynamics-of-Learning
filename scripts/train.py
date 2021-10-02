@@ -59,6 +59,7 @@ def train_epoch_manually(model, trainLoader, loss_meter, performance_meter, devi
         X = X.to(device)
         y = y.to(device)
         y_hat = model(X)
+
         if loss_type == "Cross Entropy":
             loss = torch.nn.functional.cross_entropy(y_hat, y)
         else:
@@ -139,15 +140,15 @@ def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_ep
         loss_meter = AverageMeter()
         performance_meter = AverageMeter()
 
-        train_epoch_manually(model, trainData.loader, loss_meter, performance_meter, device, loss_type)
+        train_epoch_manually(model, trainData.loader, loss_meter, performance_meter, device, loss_fn, loss_type)
         print(f"Epoch {epoch+1} completed. Loss - total: {loss_meter.sum:.4f} - average: {loss_meter.avg:.4f}; Performance: {performance_meter.avg:.4f}")
         trainLostList.append(loss_meter.sum)
         trainAccList.append(performance_meter.avg)
 
         if validate_model is True:
-            testData = MNISTParity(testset, k, 1000)
-            val_loss, val_perf = test_model_manually(model, testData.loader, performance=accuracy,
-                                                     loss_fn=loss_fn, device=device)
+            testData = MNISTParity(testset, k, batch_size)
+            val_loss, val_perf = test_model_manually(model, testData.loader, device,
+                                                     loss_type, performance=accuracy_manual, loss_fn=loss_fn)
             valLossList.append(val_loss)
             valAccList.append(val_perf)
 
@@ -164,14 +165,12 @@ def test_model(model, testLoader, performance=accuracy, loss_fn=None, device=Non
         loss_meter = AverageMeter()
 
     performance_meter = AverageMeter()
-
     model = model.to(device)
     model.eval()
     with torch.no_grad():
         for X, y in testLoader:
             X = X.to(device)
             y = y.to(device)
-
             y_hat = model(X)
             loss = loss_fn(y_hat, y) if loss_fn is not None else None
             acc = performance(y_hat, y)
@@ -185,7 +184,7 @@ def test_model(model, testLoader, performance=accuracy, loss_fn=None, device=Non
     return fin_loss, fin_perf
 
 
-def test_model_manually(model, testLoader, device, performance=accuracy,  loss_type="Cross Entropy", loss_fn=None):
+def test_model_manually(model, testLoader, device, loss_type="Cross Entropy", performance=accuracy_manual, loss_fn=None):
     loss_meter = None
     if loss_fn is not None:
         loss_meter = AverageMeter()
@@ -200,7 +199,7 @@ def test_model_manually(model, testLoader, device, performance=accuracy,  loss_t
             loss = torch.nn.functional.cross_entropy(y_hat, y)
         else:
             loss = loss_fn(y_hat, y.reshape(len(y), 1).float())
-        acc = performance(y_hat, y)
+        acc = performance(y_hat, y, loss_type)
         if loss_fn is not None:
             loss_meter.update(loss.item(), X.shape[0])
         performance_meter.update(acc, X.shape[0])
