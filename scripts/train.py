@@ -1,5 +1,6 @@
 import torch
-from .train_utils import AverageMeter, accuracy, accuracy_manual
+# TODO: Check the accuracy function, maybe it's better to use accuracy_manual (update the name in this case)
+from .train_utils import AverageMeter, accuracy_manual  # , accuracy
 from .mnistParity import MNISTParity
 
 
@@ -15,7 +16,7 @@ def train_epoch(model, trainLoader, loss_fn, optimizer, loss_meter, performance_
         #    this is the forward pass
         y_hat = model(X)
         # 3. calculate the loss on the current mini-batch
-        #loss = loss_fn(y_hat, y)
+        # loss = loss_fn(y_hat, y)
         loss = loss_fn(y_hat, y.reshape(len(y), 1).float())
         # 4. execute the backward pass given the current loss
         loss.backward()
@@ -53,7 +54,7 @@ def train_epoch_weights_manually(model, trainLoader, loss_fn, optimizer, loss_me
         performance_meter.update(val=acc, n=X.shape[0])
 
 
-def train_epoch_manually(model, trainLoader, loss_meter, performance_meter, device, loss_fn=None,
+def train_epoch_manually(model, trainLoader, loss_meter, performance_meter, performance, device, loss_fn=None,
                          loss_type="Cross Entropy"):
 
     for X, y in trainLoader:
@@ -66,10 +67,10 @@ def train_epoch_manually(model, trainLoader, loss_meter, performance_meter, devi
         else:
             loss = loss_fn(y_hat, y.reshape(len(y), 1).float())
 
-        acc = accuracy_manual(y_hat, y, loss_type)
+        acc = performance(y_hat, y, loss_type)
         loss_meter.update(val=loss, n=X.shape[0])
         performance_meter.update(val=acc, n=X.shape[0])
-        model.train(X, y)
+        model.train_manually(X, y)
 
 
 def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, batch_size, validate_model=False,
@@ -88,8 +89,8 @@ def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, bat
     valLossList = []
     valAccList = []
 
-    #trainData = MNISTParity(trainset, k, batch_size)
-    #testData = MNISTParity(testset, k, 1000)
+    # trainData = MNISTParity(trainset, k, batch_size)
+    # testData = MNISTParity(testset, k, 1000)
     for epoch in range(num_epochs):
         trainData = MNISTParity(trainset, k, batch_size)
         loss_meter = AverageMeter()
@@ -128,7 +129,7 @@ def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, bat
 
 
 def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_epochs, batch_size,
-                         validate_model=False, device=None):
+                         performance=accuracy_manual, validate_model=False, device=None):
 
     model = model.to(device)
     trainLostList = []
@@ -141,15 +142,17 @@ def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_ep
         loss_meter = AverageMeter()
         performance_meter = AverageMeter()
 
-        train_epoch_manually(model, trainData.loader, loss_meter, performance_meter, device, loss_fn, loss_type)
-        print(f"Epoch {epoch+1} completed. Loss - total: {loss_meter.sum:.4f} - average: {loss_meter.avg:.4f}; Performance: {performance_meter.avg:.4f}")
+        train_epoch_manually(model, trainData.loader, loss_meter, performance_meter, performance, device, loss_fn,
+                             loss_type)
+        print(f"Epoch {epoch+1} completed. Loss - total: {loss_meter.sum:.4f} - average: {loss_meter.avg:.4f}; "
+              f"Performance: {performance_meter.avg:.4f}")
         trainLostList.append(loss_meter.sum)
         trainAccList.append(performance_meter.avg)
 
         if validate_model is True:
             testData = MNISTParity(testset, k, batch_size)
             val_loss, val_perf = test_model_manually(model, testData.loader, device,
-                                                     loss_type, performance=accuracy_manual, loss_fn=loss_fn)
+                                                     loss_type, performance, loss_fn=loss_fn)
             valLossList.append(val_loss)
             valAccList.append(val_perf)
 
@@ -174,7 +177,7 @@ def test_model(model, testLoader, performance=accuracy_manual, loss_fn=None, dev
             y = y.to(device)
             y_hat = model(X)
             loss = loss_fn(y_hat, y.reshape(len(y), 1).float())
-            #loss = loss_fn(y_hat, y) if loss_fn is not None else None
+            # loss = loss_fn(y_hat, y) if loss_fn is not None else None
             acc = performance(y_hat, y, "BCE")
             if loss_fn is not None:
                 loss_meter.update(loss.item(), X.shape[0])
@@ -186,7 +189,8 @@ def test_model(model, testLoader, performance=accuracy_manual, loss_fn=None, dev
     return fin_loss, fin_perf
 
 
-def test_model_manually(model, testLoader, device, loss_type="Cross Entropy", performance=accuracy_manual, loss_fn=None):
+def test_model_manually(model, testLoader, device, loss_type="Cross Entropy", performance=accuracy_manual,
+                        loss_fn=None):
     loss_meter = None
     if loss_fn is not None:
         loss_meter = AverageMeter()
