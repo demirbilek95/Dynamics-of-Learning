@@ -59,7 +59,6 @@ def train_epoch_manually(model, trainLoader, loss_meter, performance_meter, perf
         X = X.to(device)
         y = y.to(device)
         y_hat = model(X)
-
         loss = torch.nn.functional.cross_entropy(y_hat, y) if loss_type == "Cross Entropy" else loss_fn(y_hat, y.reshape(len(y), 1).float())
 
         acc = performance(y_hat, y, loss_type)

@@ -59,11 +59,11 @@ class MLPManual(torch.nn.Module):
     def initializeWeights(self):
         # initialize the weights as pytorch does by default
         # e.g. 784 x 512 (pytorch initializes in this way out x in)
-        w1 = torch.empty(self.hidden_dim, self.input_dim).to(self.device_to_run)
+        w1 = torch.empty(self.input_dim, self.hidden_dim).to(self.device_to_run)
         stdv1 = 1. / math.sqrt(w1.size(1))
         w1.uniform_(-stdv1, +stdv1)
         #  e.g. 512 x 1
-        w2 = torch.empty(self.output_dim, self.hidden_dim).to(self.device_to_run)
+        w2 = torch.empty(self.hidden_dim ,self.output_dim).to(self.device_to_run)
         stdv2 = 1. / math.sqrt(w2.size(1))
         w2.uniform_(-stdv2, +stdv2)
         return w1, w2
@@ -78,13 +78,13 @@ class MLPManual(torch.nn.Module):
         X = self.flat(X)
         # batch_size changes at the end of the epoch from 128 to 96, this spawned a problem in calculations
         # a_k = W_k @ h_{k-1} + b_k, h_k = f(a_k) where h_0 = X and f is the non linearity, a_2 = y^
-        a1 = torch.matmul(X, self.w1.t())  # e.g. k=1 --> 128x784 @ 784x512
+        a1 = torch.matmul(X, self.w1)  # e.g. k=1 --> 128x784 @ 784x512
         # where 128 is batch_size (X.shape[0])
         h1 = torch.nn.functional.relu(a1)       # f is the reLU
         # need to make these variables class attribute to access from `backward` method
         self.a1 = a1
         self.h1 = h1
-        a2 = torch.matmul(h1, self.w2.t())
+        a2 = torch.matmul(h1, self.w2)
         y_hat = torch.nn.functional.softmax(a2, dim=1) if self.losstype == "Cross Entropy" else torch.sigmoid(a2)
         return y_hat
 
@@ -97,11 +97,11 @@ class MLPManual(torch.nn.Module):
         self.w2_grads = torch.matmul(self.h1.t(), e)
         # gradients of W1 --> dBCE/dW1 = dBCE/dh1 . dh1/da1 . da1/dW1
         # where dBCE/dh1 = dBCE/dy^ . dy^/da2 . da2/dh1
-        dBCE_da1 = torch.matmul(e, self.w2) * self.reLUPrime(self.a1)  # e - 128x1, w2 - 1,512 , a1 - 128,512
+        dBCE_da1 = torch.matmul(e, self.w2.t()) * self.reLUPrime(self.a1)  # e - 128x1, w2 - 512,1 , a1 - 128,512
         self.w1_grads = torch.matmul(X.t(), dBCE_da1)  # x.t - 784,128, dBCE_da1 128,512
         # Implement SGD here
-        self.w1 -= (self.learning_rate * self.w1_grads.t()) / X.shape[0]
-        self.w2 -= (self.learning_rate * self.w2_grads.t()) / X.shape[0]
+        self.w1 -= (self.learning_rate * self.w1_grads) / X.shape[0]
+        self.w2 -= (self.learning_rate * self.w2_grads) / X.shape[0]
 
     def train_manually(self, X, y):
         # Forward propagation
