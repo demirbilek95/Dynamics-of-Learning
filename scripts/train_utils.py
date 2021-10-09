@@ -1,57 +1,6 @@
 import torch
 from torch import Tensor
 
-
-def accuracy(nn_output: Tensor, ground_truth: Tensor, k: int = 1):
-    """
-    Return accuracy@k for the given model output and ground truth
-    nn_output: a tensor of shape (num_data points x num_classes) which may
-       or may not be the output of a softmax or log softmax layer
-    ground_truth: a tensor of longs or ints of shape (num_data points)
-    k: the 'k' in accuracy@k
-    """
-    assert k <= nn_output.shape[1], f"k too big. Found: {k}. Max: {nn_output.shape[1]} inferred from the nn_output"
-    # get classes of assignment for the top-k nn_outputs row-wise
-    nn_out_classes = nn_output.topk(k).indices
-    # make ground_truth a column vector
-    ground_truth_vec = ground_truth.unsqueeze(-1)
-    # and repeat the column k times (= reproduce nn_out_classes shape)
-    ground_truth_vec = ground_truth_vec.expand_as(nn_out_classes)
-    # produce tensor of booleans - at which position of the nn output is the correct class located?
-    correct_items = (nn_out_classes == ground_truth_vec)
-    # now getting the accuracy is easy, we just operate the sum of the tensor and divide it by the number of examples
-    acc = correct_items.sum().item() / nn_output.shape[0]
-    return acc
-    
-
-def predict_single_out(nn_output: torch.Tensor):
-    """
-    Make prediction when model output is only one node
-    if probability is higher than 0.5, prediction is 1, else 0
-    :param nn_output:
-    :return: prediction of the model
-    """
-    nn_output[nn_output > 0.5] = 1
-    nn_output[nn_output < 0.5] = 0
-    return nn_output.reshape(len(nn_output)).int()
-
-
-def predict_multiple_out(nn_output: torch.Tensor):
-    return torch.argmax(nn_output, dim=1)
-
-
-def accuracy_manual(nn_output: torch.Tensor, ground_truth: torch.Tensor, loss_type="Cross Entropy"):
-    if loss_type == "Cross Entropy":
-        nn_out_classes = predict_multiple_out(nn_output)
-    else:
-        nn_out_classes = predict_single_out(nn_output)
-    # produce tensor of booleans - at which position of the nn output is the correct class located?
-    correct_items = (nn_out_classes == ground_truth)
-    # now getting the accuracy is easy, we just operate the sum of the tensor and divide it by the number of examples
-    acc = correct_items.sum().item() / nn_output.shape[0]
-    return acc
-    
-    
 class AverageMeter(object):
     """
     a generic class to keep track of performance metrics during training or testing of models
@@ -70,3 +19,31 @@ class AverageMeter(object):
         self.sum += val * n
         self.count += n
         self.avg = self.sum / self.count
+
+
+def predict_single_out(nn_output: torch.Tensor):
+    """
+    Make prediction when model output is only one node
+    if probability is higher than 0.5, prediction is 1, else 0
+    :param nn_output:
+    :return: prediction of the model
+    """
+    nn_output[nn_output > 0.5] = 1
+    nn_output[nn_output < 0.5] = 0
+    return nn_output.reshape(len(nn_output)).int()
+
+
+def predict_multiple_out(nn_output: torch.Tensor):
+    return torch.argmax(nn_output, dim=1)
+
+
+def accuracy(nn_output: torch.Tensor, ground_truth: torch.Tensor, loss_type="Cross Entropy"):
+    if loss_type == "Cross Entropy":
+        nn_out_classes = predict_multiple_out(nn_output)
+    else:
+        nn_out_classes = predict_single_out(nn_output)
+    # produce tensor of booleans - at which position of the nn output is the correct class located?
+    correct_items = (nn_out_classes == ground_truth)
+    # now getting the accuracy is easy, we just operate the sum of the tensor and divide it by the number of examples
+    acc = correct_items.sum().item() / nn_output.shape[0]
+    return acc

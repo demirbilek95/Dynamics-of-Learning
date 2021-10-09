@@ -10,7 +10,7 @@ def plot_loss_accuracy(train_loss, val_loss, train_acc, val_acc, num_epochs):
 
     ax2.plot(list(range(1, num_epochs+1)), train_acc, label="Train Accuracy")
     ax2.plot(list(range(1, num_epochs+1)), val_acc, label="Validation Accuracy")
-    ax2.legend();
+    ax2.legend()
 
 
 def plotValAccuracy(val_acc, num_epochs, activation, k):
@@ -19,4 +19,4 @@ def plotValAccuracy(val_acc, num_epochs, activation, k):
     plt.plot(range(1, num_epochs+1), val_acc, label=activation)
     plt.gca().xaxis.set_major_locator(mticker.MultipleLocator(1))
     plt.grid(True)
-    plt.legend();
+    plt.legend()

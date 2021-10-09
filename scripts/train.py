@@ -1,11 +1,10 @@
 import torch
-# TODO: Check the accuracy function, maybe it's better to use accuracy_manual (update the name in this case)
-from .train_utils import AverageMeter, accuracy_manual  # , accuracy
+from .train_utils import AverageMeter, accuracy
 from .mnistParity import MNISTParity
 
 
 def train_epoch(model, trainLoader, loss_fn, optimizer, loss_meter, performance_meter, performance, device,
-                lr_scheduler):
+                lr_scheduler, loss_type):
     for X, y in trainLoader:
         X = X.to(device)
         y = y.to(device)
@@ -16,8 +15,7 @@ def train_epoch(model, trainLoader, loss_fn, optimizer, loss_meter, performance_
         #    this is the forward pass
         y_hat = model(X)
         # 3. calculate the loss on the current mini-batch
-        # loss = loss_fn(y_hat, y)
-        loss = loss_fn(y_hat, y.reshape(len(y), 1).float())
+        loss = torch.nn.functional.cross_entropy(y_hat, y) if loss_type == "Cross Entropy" else loss_fn(y_hat, y.reshape(len(y), 1).float())
         # 4. execute the backward pass given the current loss
         loss.backward()
         # 5. update the value of the params
@@ -25,20 +23,20 @@ def train_epoch(model, trainLoader, loss_fn, optimizer, loss_meter, performance_
         if lr_scheduler is not None:
             lr_scheduler.step()
         # 6. calculate the accuracy for this mini-batch
-        acc = performance(y_hat, y, "BCE")
+        acc = performance(y_hat, y, loss_type)
         # 7. update the loss and accuracy AverageMeter
         loss_meter.update(val=loss.item(), n=X.shape[0])
         performance_meter.update(val=acc, n=X.shape[0])
 
 
 def train_epoch_weights_manually(model, trainLoader, loss_fn, optimizer, loss_meter, performance_meter, performance,
-                                 device, lr, lr_scheduler):
+                                 device, lr, lr_scheduler, loss_type):
     for X, y in trainLoader:
         X = X.to(device)
         y = y.to(device)
         optimizer.zero_grad()
         y_hat = model(X)
-        loss = loss_fn(y_hat, y)
+        loss = torch.nn.functional.cross_entropy(y_hat, y) if loss_type == "Cross Entropy" else loss_fn(y_hat, y.reshape(len(y), 1).float())
         loss.backward()
         # update the weights manually here (vanilla SGD)
         with torch.no_grad():
@@ -49,23 +47,20 @@ def train_epoch_weights_manually(model, trainLoader, loss_fn, optimizer, loss_me
         if lr_scheduler is not None:
             lr_scheduler.step()
 
-        acc = performance(y_hat, y)
+        acc = performance(y_hat, y, loss_type)
         loss_meter.update(val=loss.item(), n=X.shape[0])
         performance_meter.update(val=acc, n=X.shape[0])
 
 
-def train_epoch_manually(model, trainLoader, loss_meter, performance_meter, performance, device, loss_fn=None,
-                         loss_type="Cross Entropy"):
+def train_epoch_manually(model, trainLoader, loss_meter, performance_meter, performance, device, loss_fn,
+                         loss_type):
 
     for X, y in trainLoader:
         X = X.to(device)
         y = y.to(device)
         y_hat = model(X)
 
-        if loss_type == "Cross Entropy":
-            loss = torch.nn.functional.cross_entropy(y_hat, y)
-        else:
-            loss = loss_fn(y_hat, y.reshape(len(y), 1).float())
+        loss = torch.nn.functional.cross_entropy(y_hat, y) if loss_type == "Cross Entropy" else loss_fn(y_hat, y.reshape(len(y), 1).float())
 
         acc = performance(y_hat, y, loss_type)
         loss_meter.update(val=loss, n=X.shape[0])
@@ -73,8 +68,8 @@ def train_epoch_manually(model, trainLoader, loss_meter, performance_meter, perf
         model.train_manually(X, y)
 
 
-def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, batch_size, validate_model=False,
-                performance=accuracy_manual, device=None, lr=None, lr_scheduler=None, lr_scheduler_step_on_epoch=True,
+def train_model(model, k, trainset, testset, loss_type, loss_fn, optimizer, num_epochs, batch_size, validate_model=False,
+                performance=accuracy, device=None, lr=None, lr_scheduler=None, lr_scheduler_step_on_epoch=True,
                 updateWManually=False):
 
     if device is None:
@@ -90,7 +85,7 @@ def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, bat
     valAccList = []
 
     # trainData = MNISTParity(trainset, k, batch_size)
-    # testData = MNISTParity(testset, k, 1000)
+    # testData = MNISTParity(testset, k, batch_size)
     for epoch in range(num_epochs):
         trainData = MNISTParity(trainset, k, batch_size)
         loss_meter = AverageMeter()
@@ -102,10 +97,10 @@ def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, bat
 
         if updateWManually:
             train_epoch_weights_manually(model, trainData.loader, loss_fn, optimizer, loss_meter, performance_meter,
-                                         performance, device, lr, lr_scheduler_batch)
+                                         performance, device, lr, lr_scheduler_batch, loss_type)
         else:
             train_epoch(model, trainData.loader, loss_fn, optimizer, loss_meter, performance_meter,
-                        performance, device, lr_scheduler_batch)
+                        performance, device, lr_scheduler_batch, loss_type)
 
         print(f"Epoch {epoch+1} completed. Loss - total: {loss_meter.sum:.4f} - average: {loss_meter.avg:.4f}; "
               f"Performance: {performance_meter.avg:.4f}")
@@ -113,9 +108,8 @@ def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, bat
         trainAccList.append(performance_meter.avg)
 
         if validate_model is True:
-            testData = MNISTParity(testset, k, 1000)
-            val_loss, val_perf = test_model(model, testData.loader, loss_fn=loss_fn,
-                                            device=device)
+            testData = MNISTParity(testset, k, batch_size)
+            val_loss, val_perf = test_model(model, testData.loader, loss_type, loss_fn=loss_fn, device=device)
             valLossList.append(val_loss)
             valAccList.append(val_perf)
 
@@ -129,7 +123,11 @@ def train_model(model, k, trainset, testset, loss_fn, optimizer, num_epochs, bat
 
 
 def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_epochs, batch_size,
-                         performance=accuracy_manual, validate_model=False, device=None):
+                         performance=accuracy, validate_model=False, device=None):
+
+    if device is None:
+        device = "cuda:0" if torch.cuda.is_available() else "cpu"
+    print(f"Training on {device}")
 
     model = model.to(device)
     trainLostList = []
@@ -137,6 +135,8 @@ def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_ep
     valLossList = []
     valAccList = []
 
+    # trainData = MNISTParity(trainset, k, batch_size)
+    # testData = MNISTParity(testset, k, batch_size)
     for epoch in range(num_epochs):
         trainData = MNISTParity(trainset, k, batch_size)
         loss_meter = AverageMeter()
@@ -159,7 +159,7 @@ def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_ep
     return trainLostList, trainAccList, valLossList, valAccList
 
 
-def test_model(model, testLoader, performance=accuracy_manual, loss_fn=None, device=None):
+def test_model(model, testLoader, loss_type, performance=accuracy, loss_fn=None, device=None):
 
     if device is None:
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -176,9 +176,9 @@ def test_model(model, testLoader, performance=accuracy_manual, loss_fn=None, dev
             X = X.to(device)
             y = y.to(device)
             y_hat = model(X)
-            loss = loss_fn(y_hat, y.reshape(len(y), 1).float())
+            loss = torch.nn.functional.cross_entropy(y_hat, y) if loss_type == "Cross Entropy" else loss_fn(y_hat, y.reshape(len(y), 1).float())
             # loss = loss_fn(y_hat, y) if loss_fn is not None else None
-            acc = performance(y_hat, y, "BCE")
+            acc = performance(y_hat, y, loss_type)
             if loss_fn is not None:
                 loss_meter.update(loss.item(), X.shape[0])
             performance_meter.update(acc, X.shape[0])
@@ -189,7 +189,7 @@ def test_model(model, testLoader, performance=accuracy_manual, loss_fn=None, dev
     return fin_loss, fin_perf
 
 
-def test_model_manually(model, testLoader, device, loss_type="Cross Entropy", performance=accuracy_manual,
+def test_model_manually(model, testLoader, device, loss_type, performance=accuracy,
                         loss_fn=None):
     loss_meter = None
     if loss_fn is not None:
@@ -201,10 +201,7 @@ def test_model_manually(model, testLoader, device, loss_type="Cross Entropy", pe
         y = y.to(device)
         y_hat = model(X)
 
-        if loss_type == "Cross Entropy":
-            loss = torch.nn.functional.cross_entropy(y_hat, y)
-        else:
-            loss = loss_fn(y_hat, y.reshape(len(y), 1).float())
+        loss = torch.nn.functional.cross_entropy(y_hat, y) if loss_type == "Cross Entropy" else loss_fn(y_hat, y.reshape(len(y), 1).float())
         acc = performance(y_hat, y, loss_type)
         if loss_fn is not None:
             loss_meter.update(loss.item(), X.shape[0])

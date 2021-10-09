@@ -6,7 +6,7 @@ from torch.utils.data import TensorDataset
 
 class MNISTParity:
     def __init__(self, dataset, k=1, batch_size=128):
-
+        # torch.manual_seed(42) # to make data deterministic
         self.k = k
         # indexes to sample from MNIST data
         left = torch.randperm(dataset.data.shape[0])
