@@ -59,12 +59,13 @@ class MLPManual(torch.nn.Module):
     def initializeWeights(self):
         # initialize the weights as pytorch does by default
         # e.g. 784 x 512 (pytorch initializes in this way out x in)
+        # Note: Pytorch initializes linear weights as output x input and reverse the matmul operations
         w1 = torch.empty(self.input_dim, self.hidden_dim).to(self.device_to_run)
-        stdv1 = 1. / math.sqrt(w1.size(1))
+        stdv1 = 1. / math.sqrt(w1.size(0))
         w1.uniform_(-stdv1, +stdv1)
         #  e.g. 512 x 1
         w2 = torch.empty(self.hidden_dim ,self.output_dim).to(self.device_to_run)
-        stdv2 = 1. / math.sqrt(w2.size(1))
+        stdv2 = 1. / math.sqrt(w2.size(0))
         w2.uniform_(-stdv2, +stdv2)
         return w1, w2
 
