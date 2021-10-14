@@ -14,7 +14,7 @@ class MLP(torch.nn.Module):
         # (or, a n x 1568 matrix). flatten does this
 
         if "NTK" in activation:
-            self.layerEx = torch.nn.Linear(784 * param_k, 512, bias=False)
+            self.layerEx = torch.nn.Linear(28 * 28 * param_k, 512, bias=False)
 
         self.layer1 = torch.nn.Linear(28 * 28 * param_k, 512, bias=False)
         self.layer2 = torch.nn.Linear(512, self.output_dim, bias=False)
@@ -64,7 +64,7 @@ class MLPManual(torch.nn.Module):
         stdv1 = 1. / math.sqrt(w1.size(0))
         w1.uniform_(-stdv1, +stdv1)
         #  e.g. 512 x 1
-        w2 = torch.empty(self.hidden_dim ,self.output_dim).to(self.device_to_run)
+        w2 = torch.empty(self.hidden_dim, self.output_dim).to(self.device_to_run)
         stdv2 = 1. / math.sqrt(w2.size(0))
         w2.uniform_(-stdv2, +stdv2)
         return w1, w2
@@ -92,7 +92,8 @@ class MLPManual(torch.nn.Module):
     # Backward propagation
     def backward(self, X, y, y_hat):
         X = self.flat(X)
-        e = y_hat - torch.nn.functional.one_hot(y) if self.losstype == "Cross Entropy" else y_hat - y.reshape(len(y), 1)  # e - 128x1, h1.t - 512,128 for k=1
+        # e - 128x1, h1.t - 512,128 for k=1
+        e = y_hat - torch.nn.functional.one_hot(y) if self.losstype == "Cross Entropy" else y_hat-y.reshape(len(y), 1)
         # gradients of W2 --> dBCE/dW2 = dBCE/dy^.dy^/da2. da2/dW2 = (y^ - y) h1
         # e - 128x2, h1.t - 512,128 for k=1
         self.w2_grads = torch.matmul(self.h1.t(), e)

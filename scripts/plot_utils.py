@@ -13,10 +13,21 @@ def plot_loss_accuracy(train_loss, val_loss, train_acc, val_acc, num_epochs):
     ax2.legend()
 
 
-def plotValAccuracy(val_acc, num_epochs, activation, k):
+def plotValAccuracy(val_acc, num_epochs, label, k):
     plt.ylim(0.45, 1)
     plt.title("Validation Accuracy for K = {}".format(k))
-    plt.plot(range(1, num_epochs+1), val_acc, label=activation)
+    plt.xlabel('Epoch')
+    plt.ylabel('Validation Accuracy')
+    plt.plot(range(1, num_epochs+1), val_acc, label=label)
     plt.gca().xaxis.set_major_locator(mticker.MultipleLocator(1))
     plt.grid(True)
     plt.legend()
+
+
+def fillSubplot(val_acc, num_epochs, label, ax, title):
+    ax.plot(range(1, num_epochs+1), val_acc, label=label)
+    ax.set_ylim(0.45, 1)
+    ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
+    ax.set_title(title)
+    ax.legend()
+    ax.grid()

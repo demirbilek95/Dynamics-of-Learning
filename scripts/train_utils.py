@@ -1,5 +1,5 @@
 import torch
-from torch import Tensor
+
 
 class AverageMeter(object):
     """
