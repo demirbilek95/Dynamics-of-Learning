@@ -37,14 +37,15 @@ class MLP(torch.nn.Module):
         return out
 
 
-# TODO: Try to switch to DFA
 class MLPManual(torch.nn.Module):
-    def __init__(self, param_k, lr, losstype, getWeights=False):
+    def __init__(self, param_k, lr, losstype, train_method, B_initialization, getWeights=False):
         super().__init__()
         self.input_dim = 28 * 28 * param_k
         self.hidden_dim = 512
         self.flat = torch.nn.Flatten()
         self.losstype = losstype
+        self.train_method = train_method
+        self.B_initialization = B_initialization
         self.device_to_run = "cuda:0" if torch.cuda.is_available() else "cpu"
         self.output_dim = 2 if losstype == "Cross Entropy" else 1
         self.learning_rate = lr
@@ -56,18 +57,47 @@ class MLPManual(torch.nn.Module):
         else:
             self.w1, self.w2 = self.initializeWeights()
 
+        self.B = self.initializeB(self.B_initialization) if self.train_method == "DFA" else None
+        
+        print("Training with {}".format(train_method))
+
     def initializeWeights(self):
         # initialize the weights as pytorch does by default
         # e.g. 784 x 512 (pytorch initializes in this way out x in)
-        # Note: Pytorch initializes linear weights as output x input and reverse the matmul operations
         w1 = torch.empty(self.input_dim, self.hidden_dim).to(self.device_to_run)
         stdv1 = 1. / math.sqrt(w1.size(0))
         w1.uniform_(-stdv1, +stdv1)
         #  e.g. 512 x 1
-        w2 = torch.empty(self.hidden_dim, self.output_dim).to(self.device_to_run)
+        w2 = torch.empty(self.hidden_dim ,self.output_dim).to(self.device_to_run)
         stdv2 = 1. / math.sqrt(w2.size(0))
         w2.uniform_(-stdv2, +stdv2)
         return w1, w2
+
+    def initializeB(self, initializaiton_method):
+        torch.manual_seed(42)
+        stdv2 = 1. / math.sqrt(self.w2.size(0))
+
+        if initializaiton_method == "standard uniform": 
+            B = torch.empty_like(self.w2.t())
+            B.uniform_()
+
+        elif initializaiton_method == "uniform":
+            # Initialize the random matrix similar to w2
+            B = torch.empty_like(self.w2.t())
+            B.uniform_(-stdv2, stdv2)
+
+        elif initializaiton_method == "standard gaussian":
+            # N(0,1)
+            B = torch.randn(self.w2.t().shape).to(self.device_to_run)
+
+        elif initializaiton_method == "gaussian":
+            # N(mean = stdv2, sigma = stdv2)
+            B = torch.normal(torch.tensor(stdv2), torch.tensor(stdv2), size=self.w2.t().shape).to(self.device_to_run)
+
+        else:
+            raise NotImplementedError
+
+        return B 
 
     @staticmethod
     def reLUPrime(s):
@@ -92,14 +122,18 @@ class MLPManual(torch.nn.Module):
     # Backward propagation
     def backward(self, X, y, y_hat):
         X = self.flat(X)
-        # e - 128x1, h1.t - 512,128 for k=1
-        e = y_hat - torch.nn.functional.one_hot(y) if self.losstype == "Cross Entropy" else y_hat-y.reshape(len(y), 1)
+        e = y_hat - torch.nn.functional.one_hot(y) if self.losstype == "Cross Entropy" else y_hat - y.reshape(len(y), 1)  # e - 128x1, h1.t - 512,128 for k=1
         # gradients of W2 --> dBCE/dW2 = dBCE/dy^.dy^/da2. da2/dW2 = (y^ - y) h1
         # e - 128x2, h1.t - 512,128 for k=1
         self.w2_grads = torch.matmul(self.h1.t(), e)
         # gradients of W1 --> dBCE/dW1 = dBCE/dh1 . dh1/da1 . da1/dW1
         # where dBCE/dh1 = dBCE/dy^ . dy^/da2 . da2/dh1
-        dBCE_da1 = torch.matmul(e, self.w2.t()) * self.reLUPrime(self.a1)  # e - 128x1, w2 - 512,1 , a1 - 128,512
+
+        if self.train_method == "DFA":
+            dBCE_da1 = torch.matmul(e, self.B) * self.reLUPrime(self.a1)
+        else:  # BP
+            dBCE_da1 = torch.matmul(e, self.w2.t()) * self.reLUPrime(self.a1)  # e - 128x1, w2 - 512,1 , a1 - 128,512
+            
         self.w1_grads = torch.matmul(X.t(), dBCE_da1)  # x.t - 784,128, dBCE_da1 128,512
         # Implement SGD here
         self.w1 -= (self.learning_rate * self.w1_grads) / X.shape[0]
