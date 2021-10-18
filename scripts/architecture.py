@@ -6,9 +6,8 @@ class MLP(torch.nn.Module):
     def __init__(self, param_k, activation, losstype):
         super().__init__()
 
+        self.output_dim = 2 if losstype == "Cross Entropy" else 1
         self.losstype = losstype
-        self.output_dim = 2 if self.losstype == "Cross Entropy" else 1
-
         self.activation = activation
         self.flat = torch.nn.Flatten()  # X comes in as a n x 1 x 56 x 28 -> we need n 1568-size vectors
         # (or, a n x 1568 matrix). flatten does this
@@ -45,7 +44,6 @@ class MLPManual(torch.nn.Module):
         self.flat = torch.nn.Flatten()
         self.losstype = losstype
         self.train_method = train_method
-        self.B_initialization = B_initialization
         self.device_to_run = "cuda:0" if torch.cuda.is_available() else "cpu"
         self.output_dim = 2 if losstype == "Cross Entropy" else 1
         self.learning_rate = lr
@@ -57,7 +55,7 @@ class MLPManual(torch.nn.Module):
         else:
             self.w1, self.w2 = self.initializeWeights()
 
-        self.B = self.initializeB(self.B_initialization) if self.train_method == "DFA" else None
+        self.B = self.initializeB(B_initialization) if self.train_method == "DFA" else None
         
         print("Training with {}".format(train_method))
 
