@@ -53,7 +53,7 @@ def train_epoch_weights_manually(model, trainLoader, loss_fn, optimizer, loss_me
 
 
 def train_epoch_manually(model, trainLoader, loss_meter, performance_meter, performance, device, loss_fn,
-                         loss_type):
+                         loss_type, t):
 
     for X, y in trainLoader:
         X = X.to(device)
@@ -64,7 +64,7 @@ def train_epoch_manually(model, trainLoader, loss_meter, performance_meter, perf
         acc = performance(y_hat, y, loss_type)
         loss_meter.update(val=loss, n=X.shape[0])
         performance_meter.update(val=acc, n=X.shape[0])
-        model.train_manually(X, y)
+        model.train_manually(X, y, t)
 
 
 def train_model(model, k, trainset, testset, loss_type, loss_fn, optimizer, num_epochs, batch_size, validate_model=False,
@@ -142,7 +142,7 @@ def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_ep
         performance_meter = AverageMeter()
 
         train_epoch_manually(model, trainData.loader, loss_meter, performance_meter, performance, device, loss_fn,
-                             loss_type)
+                             loss_type, epoch)
         print(f"Epoch {epoch+1} completed. Loss - total: {loss_meter.sum:.4f} - average: {loss_meter.avg:.4f}; "
               f"Performance: {performance_meter.avg:.4f}")
         trainLostList.append(loss_meter.sum)
