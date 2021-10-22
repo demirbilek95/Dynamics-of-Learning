@@ -38,7 +38,7 @@ class MLP(torch.nn.Module):
 
 
 class MLPManual(torch.nn.Module):
-    def __init__(self, param_k, lr, losstype, train_method, optim, B_initialization, getWeights=False):
+    def __init__(self, param_k, lr, losstype, train_method, B_initialization, optim, getWeights=False):
         super().__init__()
         self.input_dim = 28 * 28 * param_k
         self.hidden_dim = 512
