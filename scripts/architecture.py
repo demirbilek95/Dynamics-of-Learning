@@ -53,7 +53,7 @@ class MLPManual(torch.nn.Module):
         if getWeights:
             self.w1, self.w2 = getWeights
         else:
-            self.w1, self.w2 = self.__initializeWeights()
+            self.w1, self.w2 = self.initializeWeights()
 
         self.w1_grads = torch.empty_like(self.w1)
         self.w2_grads = torch.empty_like(self.w2)
@@ -62,8 +62,7 @@ class MLPManual(torch.nn.Module):
         self.B = self.initializeB(B_initialization) if self.train_method == "DFA" else None
         self.optimizer = Optimizer(self.optim, self.learning_rate, self.w1.size(), self.w2.size(), self.device_to_run)
 
-    @classmethod
-    def __initializeWeights(self):
+    def initializeWeights(self):
         # initialize the weights as pytorch does by default
         # e.g. 784 x 512 (pytorch initializes in this way out x in)
         w1 = torch.empty(self.input_dim, self.hidden_dim).to(self.device_to_run)
@@ -75,7 +74,6 @@ class MLPManual(torch.nn.Module):
         w2.uniform_(-stdv2, +stdv2)
         return w1, w2
 
-    @classmethod
     def initializeB(self, initializaiton_method):
         torch.manual_seed(42)
         stdv2 = 1. / math.sqrt(self.w2.size(0))
@@ -102,7 +100,6 @@ class MLPManual(torch.nn.Module):
         return s
 
     # Forward propagation
-    @classmethod
     def forward(self, X):
         X = self.flat(X)
         # batch_size changes at the end of the epoch from 128 to 96, this spawned a problem in calculations
@@ -118,7 +115,6 @@ class MLPManual(torch.nn.Module):
         return y_hat
 
     # Backward propagation
-    @classmethod
     def backward(self, X, y, y_hat):
         X = self.flat(X)
         e = y_hat - torch.nn.functional.one_hot(y) if self.losstype == "Cross Entropy" else y_hat - y.reshape(len(y), 1)  # e - 128x1, h1.t - 512,128 for k=1
@@ -137,10 +133,9 @@ class MLPManual(torch.nn.Module):
         self.w1_grads = torch.matmul(X.t(), dBCE_da1)  # x.t - 784,128, dBCE_da1 128,512
         self.w1_grads /= X.shape[0]
 
-    @classmethod
-    def train_manually(self, X, y, t):
+    def train_manually(self, X, y, t, momentum, nesterov_momentum, weight_decay):
         # Forward propagation
         y_hat = self.forward(X)
         # Backward propagation and gradient descent
         self.backward(X, y, y_hat)
-        self.w1, self.w2 = self.optimizer.updateParameters(t, False, False, self.w1, self.w2, self.w1_grads, self.w2_grads)
+        self.w1, self.w2 = self.optimizer.updateParameters(t, self.w1, self.w2, self.w1_grads, self.w2_grads, momentum, nesterov_momentum, weight_decay)

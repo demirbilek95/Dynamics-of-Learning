@@ -30,4 +30,4 @@ def fillSubplot(val_acc, num_epochs, label, ax, title):
     ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
     ax.set_title(title)
     ax.legend()
-    ax.grid()
+    ax.grid(b=True)

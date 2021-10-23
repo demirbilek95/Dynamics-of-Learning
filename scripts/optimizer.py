@@ -13,38 +13,42 @@ class Optimizer:
 
         print("Training with {}".format(method))
 
-    @classmethod
+    def __addWeightDecay(self,weight_decay, w1, w2, w1_grads, w2_grads):
+        if weight_decay:
+            w1_grads += weight_decay * w1
+            w2_grads += weight_decay * w2
+        return w1_grads, w2_grads
+
     def __updateWeights(self, deltaw1, deltaw2, w1, w2):
         w1 -= deltaw1
         w2 -= deltaw2
         return w1, w2
 
-    @classmethod
-    def updateParameters(self, t, momentum, nesterov_momentum, w1, w2, w1_grads, w2_grads):
+    def updateParameters(self, t, w1, w2, w1_grads, w2_grads, momentum, nesterov_momentum, weight_decay):
         if self.method == "SGD":
-            w1, w2 = self.__SGD(momentum, nesterov_momentum, w1, w2, w1_grads, w2_grads)
+            w1, w2 = self.__SGD(w1, w2, w1_grads, w2_grads, momentum, nesterov_momentum, weight_decay)
         elif self.method == "Adagrad":
-            w1, w2 = self.__Adagrad(w1, w2, w1_grads, w2_grads)
+            w1, w2 = self.__Adagrad(w1, w2, w1_grads, w2_grads, weight_decay)
         elif self.method == "Adadelta":
-            w1, w2 = self.__Adadelta(w1, w2, w1_grads, w2_grads)
+            w1, w2 = self.__Adadelta(w1, w2, w1_grads, w2_grads, weight_decay)
         elif self.method == "RMSProp":
-            w1, w2 = self.__RMSProp(w1, w2, w1_grads, w2_grads)
+            w1, w2 = self.__RMSProp(w1, w2, w1_grads, w2_grads, weight_decay)
         elif self.method == "Adam":
-            w1, w2 = self.__Adam(t, w1, w2, w1_grads, w2_grads)
+            w1, w2 = self.__Adam(t, w1, w2, w1_grads, w2_grads, weight_decay)
         else:
             raise NotImplementedError
 
         return w1, w2
 
-    @classmethod
-    def __SGD(self, momentum, nesterov_momentum, w1, w2, w1_grads, w2_grads):
+    def __SGD(self, w1, w2, w1_grads, w2_grads, momentum=0.9, nesterov_momentum=0.9, weight_decay = 1e-3):
+        w1_grads, w2_grads = self.__addWeightDecay(weight_decay, w1, w2, w1_grads, w2_grads)
         if momentum:
-            self.A1 = 0.9 * self.A1 + self.lr * w1_grads
-            self.A2 = 0.9 * self.A2 + self.lr * w2_grads
+            self.A1 = momentum * self.A1 + self.lr * w1_grads
+            self.A2 = momentum * self.A2 + self.lr * w2_grads
             w1, w2 = self.__updateWeights(self.A1, self.A2, w1, w2)
         elif nesterov_momentum:
-            self.A1 = 0.9 * self.A1 + self.lr * (w1_grads - 0.9 * self.A1)
-            self.A2 = 0.9 * self.A2 + self.lr * (w2_grads - 0.9 * self.A2)
+            self.A1 = nesterov_momentum * self.A1 + self.lr * (w1_grads - nesterov_momentum * self.A1)
+            self.A2 = nesterov_momentum * self.A2 + self.lr * (w2_grads - nesterov_momentum * self.A2)
             w1, w2 = self.__updateWeights(self.A1, self.A2, w1, w2)
         else:
             deltaw1 = self.lr * w1_grads
@@ -52,9 +56,10 @@ class Optimizer:
             w1, w2 = self.__updateWeights(deltaw1, deltaw2, w1, w2)
         return w1, w2
 
-    @classmethod
-    def __Adagrad(self, w1, w2, w1_grads, w2_grads):
+    def __Adagrad(self, w1, w2, w1_grads, w2_grads, weight_decay = 1e-3):
         eps = 1e-8
+        w1_grads, w2_grads = self.__addWeightDecay(weight_decay, w1, w2, w1_grads, w2_grads)
+
         self.A1 += torch.square(w1_grads)
         self.A2 += torch.square(w2_grads)
         deltaw1 = self.lr * w1_grads / torch.sqrt(self.A1 + eps)
@@ -62,45 +67,49 @@ class Optimizer:
         w1, w2 = self.__updateWeights(deltaw1, deltaw2, w1, w2)
         return w1, w2
 
-    @classmethod
-    def __Adadelta(self, w1, w2, w1_grads, w2_grads):
+    def __Adadelta(self, w1, w2, w1_grads, w2_grads, gamma=0.9, weight_decay = 1e-3):
         eps = 1e-8
-        self.A1 = 0.9 * self.A1 + 0.1 * torch.square(w1_grads)
-        self.A2 = 0.9 * self.A2 + 0.1 * torch.square(w2_grads)
+        w1_grads, w2_grads = self.__addWeightDecay(weight_decay, w1, w2, w1_grads, w2_grads)
+
+        self.A1 = gamma * self.A1 + (1-gamma) * torch.square(w1_grads)
+        self.A2 = gamma * self.A2 + (1-gamma) * torch.square(w2_grads)
 
         deltaw1 = torch.sqrt(self.B1 + eps) * w1_grads / torch.sqrt(self.A1 + eps)
         deltaw2 = torch.sqrt(self.B2 + eps) * w2_grads / torch.sqrt(self.A2 + eps)
+        deltaw1 *= self.lr
+        deltaw2 *= self.lr
         w1, w2 = self.__updateWeights(deltaw1, deltaw2, w1, w2)
 
-        self.B1 = 0.9 * self.B1 + 0.1 * torch.square(deltaw1)
-        self.B2 = 0.9 * self.B2 + 0.1 * torch.square(deltaw2)
+        self.B1 = gamma * self.B1 + (1-gamma) * torch.square(deltaw1)
+        self.B2 = gamma * self.B2 + (1-gamma) * torch.square(deltaw2)
+
         return w1, w2
 
-    @classmethod
-    def __RMSProp(self, w1, w2, w1_grads, w2_grads):
+    def __RMSProp(self, w1, w2, w1_grads, w2_grads, gamma=0.9, weight_decay = 1e-3):
         eps = 1e-8
-        self.A1 = 0.9 * self.A1 + 0.1 * torch.square(w1_grads)
-        self.A2 = 0.9 * self.A2 + 0.1 * torch.square(w2_grads)
+        w1_grads, w2_grads = self.__addWeightDecay(weight_decay, w1, w2, w1_grads, w2_grads)
+        self.A1 = gamma * self.A1 + (1-gamma) * torch.square(w1_grads)
+        self.A2 = gamma * self.A2 + (1-gamma) * torch.square(w2_grads)
 
         deltaw1 = self.lr * w1_grads / torch.sqrt(self.A1 + eps)
         deltaw2 = self.lr * w2_grads / torch.sqrt(self.A2 + eps)
         w1, w2 = self.__updateWeights(deltaw1, deltaw2, w1, w2)
         return w1, w2
 
-    @classmethod
-    def __Adam(self, t, w1, w2, w1_grads, w2_grads):
+    def __Adam(self, t, w1, w2, w1_grads, w2_grads, beta1=0.9, beta2=0.999, weight_decay = 1e-3):
         eps = 1e-8
-        self.A1 = 0.9 * self.A1 + 0.1 * w1_grads
-        self.A2 = 0.9 * self.A2 + 0.1 * w2_grads
+        w1_grads, w2_grads = self.__addWeightDecay(weight_decay, w1, w2, w1_grads, w2_grads)
+        self.A1 = beta1 * self.A1 + (1-beta1) * w1_grads
+        self.A2 = beta1 * self.A2 + (1-beta1) * w2_grads
 
-        self.B1 = 0.999 * self.B1 + 0.001 * torch.square(w1_grads)
-        self.B2 = 0.999 * self.B2 + 0.001 * torch.square(w2_grads)
+        self.B1 = beta2 * self.B1 + (1-beta2) * torch.square(w1_grads)
+        self.B2 = beta2 * self.B2 + (1-beta2) * torch.square(w2_grads)
         # bias corrected form
-        mt1hat = self.A1 / (1-(0.9 ** (t+1)))
-        mt2hat = self.A2 / (1-(0.9 ** (t+1)))
+        mt1hat = self.A1 / (1-(beta1 ** (t+1)))
+        mt2hat = self.A2 / (1-(beta1 ** (t+1)))
 
-        vt1hat = self.B1 / (1-(0.999 ** (t+1)))
-        vt2hat = self.B2 / (1-(0.999 ** (t+1)))
+        vt1hat = self.B1 / (1-(beta2 ** (t+1)))
+        vt2hat = self.B2 / (1-(beta2 ** (t+1)))
 
         deltaw1 = self.lr * mt1hat / (torch.sqrt(vt1hat) + eps)
         deltaw2 = self.lr * mt2hat / (torch.sqrt(vt2hat) + eps)
