@@ -13,11 +13,13 @@ class Optimizer:
 
         print("Training with {}".format(method))
 
+    @classmethod
     def __updateWeights(self, deltaw1, deltaw2, w1, w2):
         w1 -= deltaw1
         w2 -= deltaw2
         return w1, w2
 
+    @classmethod
     def updateParameters(self, t, momentum, nesterov_momentum, w1, w2, w1_grads, w2_grads):
         if self.method == "SGD":
             w1, w2 = self.__SGD(momentum, nesterov_momentum, w1, w2, w1_grads, w2_grads)
@@ -34,6 +36,7 @@ class Optimizer:
 
         return w1, w2
 
+    @classmethod
     def __SGD(self, momentum, nesterov_momentum, w1, w2, w1_grads, w2_grads):
         if momentum:
             self.A1 = 0.9 * self.A1 + self.lr * w1_grads
@@ -49,6 +52,7 @@ class Optimizer:
             w1, w2 = self.__updateWeights(deltaw1, deltaw2, w1, w2)
         return w1, w2
 
+    @classmethod
     def __Adagrad(self, w1, w2, w1_grads, w2_grads):
         eps = 1e-8
         self.A1 += torch.square(w1_grads)
@@ -58,6 +62,7 @@ class Optimizer:
         w1, w2 = self.__updateWeights(deltaw1, deltaw2, w1, w2)
         return w1, w2
 
+    @classmethod
     def __Adadelta(self, w1, w2, w1_grads, w2_grads):
         eps = 1e-8
         self.A1 = 0.9 * self.A1 + 0.1 * torch.square(w1_grads)
@@ -71,6 +76,7 @@ class Optimizer:
         self.B2 = 0.9 * self.B2 + 0.1 * torch.square(deltaw2)
         return w1, w2
 
+    @classmethod
     def __RMSProp(self, w1, w2, w1_grads, w2_grads):
         eps = 1e-8
         self.A1 = 0.9 * self.A1 + 0.1 * torch.square(w1_grads)
@@ -81,6 +87,7 @@ class Optimizer:
         w1, w2 = self.__updateWeights(deltaw1, deltaw2, w1, w2)
         return w1, w2
 
+    @classmethod
     def __Adam(self, t, w1, w2, w1_grads, w2_grads):
         eps = 1e-8
         self.A1 = 0.9 * self.A1 + 0.1 * w1_grads
