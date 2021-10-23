@@ -76,8 +76,6 @@ class Optimizer:
 
         deltaw1 = torch.sqrt(self.B1 + eps) * w1_grads / torch.sqrt(self.A1 + eps)
         deltaw2 = torch.sqrt(self.B2 + eps) * w2_grads / torch.sqrt(self.A2 + eps)
-        deltaw1 *= self.lr
-        deltaw2 *= self.lr
         w1, w2 = self.__updateWeights(deltaw1, deltaw2, w1, w2)
 
         self.B1 = gamma * self.B1 + (1-gamma) * torch.square(deltaw1)
