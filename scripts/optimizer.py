@@ -71,7 +71,7 @@ class Optimizer:
         self.B2 = gamma * self.B2 + (1-gamma) * torch.square(deltaw2)
         return w1, w2
 
-    def __RMSProp(self, w1, w2, w1_grads, w2_grads):
+    def __RMSProp(self, w1, w2, w1_grads, w2_grads, gamma=0.9):
         eps = 1e-8
         self.A1 = gamma * self.A1 + (1-gamma) * torch.square(w1_grads)
         self.A2 = gamma * self.A2 + (1-gamma) * torch.square(w2_grads)

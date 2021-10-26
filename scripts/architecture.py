@@ -75,7 +75,7 @@ class MLPManual(torch.nn.Module):
         return w1, w2
 
     def initializeB(self, initializaiton_method):
-        torch.manual_seed(42)
+        #torch.manual_seed(42)
         stdv2 = 1. / math.sqrt(self.w2.size(0))
         if initializaiton_method == "standard uniform":
             B = torch.empty_like(self.w2.t())
