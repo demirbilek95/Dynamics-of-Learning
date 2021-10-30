@@ -133,9 +133,9 @@ class MLPManual(torch.nn.Module):
         self.w1_grads = torch.matmul(X.t(), dBCE_da1)  # x.t - 784,128, dBCE_da1 128,512
         self.w1_grads /= X.shape[0]
 
-    def train_manually(self, X, y, t, momentum, nesterov_momentum):
+    def train_manually(self, X, y, t, momentum, nesterov_momentum, weight_decay):
         # Forward propagation
         y_hat = self.forward(X)
         # Backward propagation and gradient descent
         self.backward(X, y, y_hat)
-        self.w1, self.w2 = self.optimizer.updateParameters(t, self.w1, self.w2, self.w1_grads, self.w2_grads, momentum, nesterov_momentum)
+        self.w1, self.w2 = self.optimizer.updateParameters(t, self.w1, self.w2, self.w1_grads, self.w2_grads, momentum, nesterov_momentum, weight_decay)

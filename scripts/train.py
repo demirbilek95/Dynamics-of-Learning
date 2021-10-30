@@ -53,7 +53,7 @@ def train_epoch_weights_manually(model, trainLoader, loss_fn, optimizer, loss_me
 
 
 def train_epoch_manually(model, trainLoader, loss_meter, performance_meter, performance, device, loss_fn,
-                         loss_type, t, momentum, nesterov_momentum):
+                         loss_type, t, momentum, nesterov_momentum, weight_decay):
 
     for X, y in trainLoader:
         X = X.to(device)
@@ -64,7 +64,7 @@ def train_epoch_manually(model, trainLoader, loss_meter, performance_meter, perf
         acc = performance(y_hat, y, loss_type)
         loss_meter.update(val=loss, n=X.shape[0])
         performance_meter.update(val=acc, n=X.shape[0])
-        model.train_manually(X, y, t, momentum, nesterov_momentum)
+        model.train_manually(X, y, t, momentum, nesterov_momentum, weight_decay)
 
 
 def train_model(model, k, trainset, testset, loss_type, loss_fn, optimizer, num_epochs, batch_size, validate_model=False,
@@ -122,7 +122,7 @@ def train_model(model, k, trainset, testset, loss_type, loss_fn, optimizer, num_
 
 
 def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_epochs, batch_size,momentum, 
-                        nesterov_momentum, performance=accuracy, validate_model=False, device=None):
+                        nesterov_momentum, weight_decay, performance=accuracy, validate_model=False, device=None):
 
     if device is None:
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -142,7 +142,7 @@ def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_ep
         performance_meter = AverageMeter()
 
         train_epoch_manually(model, trainData.loader, loss_meter, performance_meter, performance, device, loss_fn,
-                             loss_type, epoch, momentum, nesterov_momentum)
+                             loss_type, epoch, momentum, nesterov_momentum, weight_decay)
         print(f"Epoch {epoch+1} completed. Loss - total: {loss_meter.sum:.4f} - average: {loss_meter.avg:.4f}; "
               f"Performance: {performance_meter.avg:.4f}")
         trainLostList.append(loss_meter.sum)
