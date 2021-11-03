@@ -45,6 +45,7 @@ class MLPManual(torch.nn.Module):
         self.flat = torch.nn.Flatten()
         self.losstype = losstype
         self.train_method = train_method
+        self.B_initialization = B_initialization
         self.optim = optim
         self.device_to_run = device
         self.output_dim = 2 if losstype == "Cross Entropy" else 1
@@ -58,8 +59,7 @@ class MLPManual(torch.nn.Module):
         self.w1_grads = torch.empty_like(self.w1)
         self.w2_grads = torch.empty_like(self.w2)
 
-        print("Training with {}".format(train_method))
-        self.B = self.initializeB(B_initialization) if self.train_method == "DFA" else None
+        self.B = self.initializeB(self.B_initialization) if self.train_method == "DFA" else None
         self.optimizer = Optimizer(self.optim, self.learning_rate, self.w1.size(), self.w2.size(), self.device_to_run)
 
     def initializeWeights(self):
@@ -93,6 +93,11 @@ class MLPManual(torch.nn.Module):
         else:
             raise NotImplementedError
         return B
+
+    def setWeightsGradientsDefault(self):
+        self.w1, self.w2 = self.initializeWeights()
+        self.w1_grads = torch.empty_like(self.w1)
+        self.w2_grads = torch.empty_like(self.w2)
 
     @staticmethod
     def reLUPrime(s):

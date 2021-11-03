@@ -127,6 +127,9 @@ def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_ep
     if device is None:
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
     print(f"Training on {device}")
+    print(f"Training method {model.train_method} and optimizer {model.optim}")
+    if model.train_method:
+        print(f"Random matrix initialization {model.B_initialization}")
 
     model = model.to(device)
     trainLostList = []
@@ -154,6 +157,8 @@ def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_ep
                                                      loss_type, performance, loss_fn=loss_fn)
             valLossList.append(val_loss)
             valAccList.append(val_perf)
+
+    model.setWeightsGradientsDefault()
 
     return trainLostList, trainAccList, valLossList, valAccList
 
