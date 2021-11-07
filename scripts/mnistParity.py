@@ -12,6 +12,12 @@ class MNISTParity:
         left = torch.randperm(dataset.data.shape[0])
         right = torch.randperm(dataset.data.shape[0])
         middle = torch.randperm(dataset.data.shape[0])
+
+        # TODO: These parts are added for t-SNE, may need to remove later 
+        self.original_target = dataset.targets
+        self.left_target = dataset.targets[left]
+        self.middle_target = dataset.targets[middle]
+        self.right_target = dataset.targets[right]
         
         # concatenate them to have horizontally stacked images
         if k == 2:

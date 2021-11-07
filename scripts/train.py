@@ -53,18 +53,27 @@ def train_epoch_weights_manually(model, trainLoader, loss_fn, optimizer, loss_me
 
 
 def train_epoch_manually(model, trainLoader, loss_meter, performance_meter, performance, device, loss_fn,
-                         loss_type, t, momentum, nesterov_momentum, weight_decay):
+                         loss_type, t, momentum, nesterov_momentum, weight_decay, measure_alignment, train_method):
 
     for X, y in trainLoader:
         X = X.to(device)
         y = y.to(device)
-        y_hat = model(X)
+        y_hat, a1, h1 = model(X, model.w1, model.w2)
         loss = torch.nn.functional.cross_entropy(y_hat, y) if loss_type == "Cross Entropy" else loss_fn(y_hat, y.reshape(len(y), 1).float())
 
         acc = performance(y_hat, y, loss_type)
         loss_meter.update(val=loss, n=X.shape[0])
         performance_meter.update(val=acc, n=X.shape[0])
-        model.train_manually(X, y, t, momentum, nesterov_momentum, weight_decay)
+        model.train_manually(X, y, t, momentum, nesterov_momentum, weight_decay, train_method, measure_alignment)
+
+    if measure_alignment:
+        similarity_w2B, similarity_w1_grads, similarity_w2_grads = model.measureSimilarity()
+        print("W2.T and B similarity: {}, W1 gradient similarity {} and W2 gradient similarity {}".format(similarity_w2B, 
+                                                                                                       similarity_w1_grads, similarity_w2_grads))
+    else:
+        similarity_w2B, similarity_w1_grads, similarity_w2_grads = None, None, None
+        
+    return similarity_w2B, similarity_w1_grads, similarity_w2_grads
 
 
 def train_model(model, k, trainset, testset, loss_type, loss_fn, optimizer, num_epochs, batch_size, validate_model=False,
@@ -121,14 +130,14 @@ def train_model(model, k, trainset, testset, loss_type, loss_fn, optimizer, num_
     return trainLostList, trainAccList, valLossList, valAccList
 
 
-def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_epochs, batch_size,momentum, 
-                        nesterov_momentum, weight_decay, performance=accuracy, validate_model=False, device=None):
+def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_epochs, batch_size, momentum, 
+                        nesterov_momentum, weight_decay, measure_alignment, performance=accuracy, validate_model=False, device=None):
 
     if device is None:
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
     print(f"Training on {device}")
     print(f"Training method {model.train_method} and optimizer {model.optim}")
-    if model.train_method:
+    if model.train_method == "DFA":
         print(f"Random matrix initialization {model.B_initialization}")
 
     model = model.to(device)
@@ -136,6 +145,10 @@ def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_ep
     trainAccList = []
     valLossList = []
     valAccList = []
+    # alignment lists
+    w2B = []
+    w1grads = []
+    w2grads = []
 
     # trainData = MNISTParity(trainset, k, batch_size)
     # testData = MNISTParity(testset, k, batch_size)
@@ -144,8 +157,13 @@ def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_ep
         loss_meter = AverageMeter()
         performance_meter = AverageMeter()
 
-        train_epoch_manually(model, trainData.loader, loss_meter, performance_meter, performance, device, loss_fn,
-                             loss_type, epoch, momentum, nesterov_momentum, weight_decay)
+        similarity_w2B, similarity_w1_grads, similarity_w2_grads = train_epoch_manually(model, trainData.loader, loss_meter, performance_meter, performance, device, loss_fn,
+                             loss_type, epoch, momentum, nesterov_momentum, weight_decay, measure_alignment, model.train_method)
+        
+        w2B.append(similarity_w2B)
+        w1grads.append(similarity_w1_grads)
+        w2grads.append(similarity_w2_grads)
+        
         print(f"Epoch {epoch+1} completed. Loss - total: {loss_meter.sum:.4f} - average: {loss_meter.avg:.4f}; "
               f"Performance: {performance_meter.avg:.4f}")
         trainLostList.append(loss_meter.sum)
@@ -160,7 +178,7 @@ def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_ep
 
     model.setWeightsGradientsDefault()
 
-    return trainLostList, trainAccList, valLossList, valAccList
+    return trainLostList, trainAccList, valLossList, valAccList, w2B, w1grads, w2grads
 
 
 def test_model(model, testLoader, loss_type, performance=accuracy, loss_fn=None, device=None):
@@ -203,7 +221,7 @@ def test_model_manually(model, testLoader, device, loss_type, performance=accura
     for X, y in testLoader:
         X = X.to(device)
         y = y.to(device)
-        y_hat = model(X)
+        y_hat, a1, h1 = model(X, model.w1, model.w2)
 
         loss = torch.nn.functional.cross_entropy(y_hat, y) if loss_type == "Cross Entropy" else loss_fn(y_hat, y.reshape(len(y), 1).float())
         acc = performance(y_hat, y, loss_type)

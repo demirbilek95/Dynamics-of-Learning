@@ -10,8 +10,8 @@ class MLP(torch.nn.Module):
         self.output_dim = 2 if losstype == "Cross Entropy" else 1
         self.losstype = losstype
         self.activation = activation
-        self.flat = torch.nn.Flatten()  # X comes in as a n x 1 x 56 x 28 -> we need n 1568-size vectors
-        # (or, a n x 1568 matrix). flatten does this
+        self.flat = torch.nn.Flatten()  # X comes in as a n x 1 x 28 x 28 -> we need n 784-size vectors
+        # (or, a n x 784 matrix). flatten does this
 
         if "NTK" in activation:
             self.layerEx = torch.nn.Linear(28 * 28 * param_k, 512, bias=False)
@@ -38,18 +38,20 @@ class MLP(torch.nn.Module):
 
 
 class MLPManual(torch.nn.Module):
-    def __init__(self, param_k, lr, losstype, train_method, B_initialization, optim, device, getWeights=False):
+    def __init__(self, param_k, lr, losstype, train_method, B_initialization, optim, device, measure_alignment, getWeights=False):
         super().__init__()
+        self.device_to_run = device
         self.input_dim = 28 * 28 * param_k
         self.hidden_dim = 512
+        self.output_dim = 2 if losstype == "Cross Entropy" else 1
         self.flat = torch.nn.Flatten()
         self.losstype = losstype
         self.train_method = train_method
         self.B_initialization = B_initialization
+        self.measure_alignment = measure_alignment
         self.optim = optim
-        self.device_to_run = device
-        self.output_dim = 2 if losstype == "Cross Entropy" else 1
         self.learning_rate = lr
+
         # initialize weights and gradients
         if getWeights:
             self.w1, self.w2 = getWeights
@@ -59,7 +61,11 @@ class MLPManual(torch.nn.Module):
         self.w1_grads = torch.empty_like(self.w1)
         self.w2_grads = torch.empty_like(self.w2)
 
-        self.B = self.initializeB(self.B_initialization) if self.train_method == "DFA" else None
+        if self.measure_alignment:
+            self.w1_BP , self.w2_BP = self.w1.clone(), self.w2.clone()
+            self.w1_grads_BP, self.w2_grads_BP =  self.w1_grads.clone(), self.w2_grads.clone()
+        
+        self.B = self.initializeB(self.B_initialization) if train_method == "DFA" else None
         self.optimizer = Optimizer(self.optim, self.learning_rate, self.w1.size(), self.w2.size(), self.device_to_run)
 
     def initializeWeights(self):
@@ -105,42 +111,56 @@ class MLPManual(torch.nn.Module):
         return s
 
     # Forward propagation
-    def forward(self, X):
+    def forward(self, X, w1, w2):
         X = self.flat(X)
         # batch_size changes at the end of the epoch from 128 to 96, this spawned a problem in calculations
         # a_k = W_k @ h_{k-1} + b_k, h_k = f(a_k) where h_0 = X and f is the non linearity, a_2 = y^
-        a1 = torch.matmul(X, self.w1)  # e.g. k=1 --> 128x784 @ 784x512
+        a1 = torch.matmul(X, w1)  # e.g. k=1 --> 128x784 @ 784x512
         # where 128 is batch_size (X.shape[0])
         h1 = torch.nn.functional.relu(a1)       # f is the reLU
-        # need to make these variables class attribute to access from `backward` method
-        self.a1 = a1
-        self.h1 = h1
-        a2 = torch.matmul(h1, self.w2)
+        a2 = torch.matmul(h1, w2)
         y_hat = torch.nn.functional.softmax(a2, dim=1) if self.losstype == "Cross Entropy" else torch.sigmoid(a2)
-        return y_hat
+        return y_hat, a1, h1
 
     # Backward propagation
-    def backward(self, X, y, y_hat):
+    def backward(self, X, y, y_hat, h1, a1, w2, B, train_method):
         X = self.flat(X)
-        e = y_hat - torch.nn.functional.one_hot(y) if self.losstype == "Cross Entropy" else y_hat - y.reshape(len(y), 1)  # e - 128x1, h1.t - 512,128 for k=1
+        self.e = y_hat - torch.nn.functional.one_hot(y) if self.losstype == "Cross Entropy" else y_hat - y.reshape(len(y), 1)  # e - 128x1, h1.t - 512,128 for k=1
         # gradients of W2 --> dBCE/dW2 = dBCE/dy^.dy^/da2. da2/dW2 = (y^ - y) h1
         # e - 128x2, h1.t - 512,128 for k=1
-        self.w2_grads = torch.matmul(self.h1.t(), e)
-        self.w2_grads /= X.shape[0]
+        w2_grads = torch.matmul(h1.t(), self.e)
+        w2_grads /= X.shape[0]
         # gradients of W1 --> dBCE/dW1 = dBCE/dh1 . dh1/da1 . da1/dW1
         # where dBCE/dh1 = dBCE/dy^ . dy^/da2 . da2/dh1
 
-        if self.train_method == "DFA":
-            dBCE_da1 = torch.matmul(e, self.B) * self.reLUPrime(self.a1)
+        if train_method == "DFA": 
+            self.dBCE_da1 = torch.matmul(self.e, B) * self.reLUPrime(a1)    
         else:  # BP
-            dBCE_da1 = torch.matmul(e, self.w2.t()) * self.reLUPrime(self.a1)  # e - 128x1, w2 - 512,1 , a1 - 128,512
+            self.dBCE_da1 = torch.matmul(self.e, w2.t()) * self.reLUPrime(a1)  # e - 128x1, w2 - 512,1 , a1 - 128,512
 
-        self.w1_grads = torch.matmul(X.t(), dBCE_da1)  # x.t - 784,128, dBCE_da1 128,512
-        self.w1_grads /= X.shape[0]
+        w1_grads = torch.matmul(X.t(), self.dBCE_da1)  # x.t - 784,128, dBCE_da1 128,512   
 
-    def train_manually(self, X, y, t, momentum, nesterov_momentum, weight_decay):
+        # w1_grads = torch.matmul(X.t(), dBCE_da1)  # x.t - 784,128, dBCE_da1 128,512
+        w1_grads /= X.shape[0]
+        return w1_grads, w2_grads
+
+    def train_manually(self, X, y, t, momentum, nesterov_momentum, weight_decay, train_method, measure_alignment):
         # Forward propagation
-        y_hat = self.forward(X)
+        y_hat, a1, h1 = self.forward(X, self.w1, self.w2)
         # Backward propagation and gradient descent
-        self.backward(X, y, y_hat)
+        self.w1_grads, self.w2_grads =  self.backward(X, y, y_hat, h1, a1, self.w2, self.B, train_method)
         self.w1, self.w2 = self.optimizer.updateParameters(t, self.w1, self.w2, self.w1_grads, self.w2_grads, momentum, nesterov_momentum, weight_decay)
+
+        if measure_alignment:
+            y_hat_BP, a1_BP, h1_BP = self.forward(X, self.w1_BP, self.w2_BP)
+            self.w1_grads_BP, self.w2_grads_BP = self.backward(X, y, y_hat_BP, h1_BP, a1_BP, self.w2_BP, None, "BP")
+            self.w1_BP, self.w2_BP = self.optimizer.updateParameters(t, self.w1_BP, self.w2_BP, self.w1_grads_BP, self.w2_grads_BP, momentum, nesterov_momentum, 
+                                                                    weight_decay)
+
+    def measureSimilarity(self):
+        cos = torch.nn.CosineSimilarity()
+        similarity_w2B = cos(self.B, self.w2.t()).mean().item()
+
+        similarity_w1_grads = cos(self.w1_grads, self.w1_grads_BP ).mean().item()
+        similarity_w2_grads = cos(self.w2_grads, self.w2_grads_BP).mean().item()
+        return similarity_w2B, similarity_w1_grads, similarity_w2_grads
