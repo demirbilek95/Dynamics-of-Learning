@@ -31,7 +31,7 @@ def plotValAccuracy(val_acc, num_epochs, label, k):
 def fillSubplot(val_acc, num_epochs, label, ax, title):
     ax.plot(range(1, num_epochs+1), val_acc, label=label)
     ax.set_ylim(0.45, 1)
-    ax.xaxis.set_major_locator(mticker.MaxNLocator(integer=True))
-    ax.set_title(title)
+    ax.set_xticks(range(1,21))
+    ax.set_title(title, fontsize = 15)
     ax.legend()
     ax.grid(b=True)
