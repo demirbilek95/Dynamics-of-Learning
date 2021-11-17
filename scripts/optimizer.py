@@ -2,9 +2,10 @@ import torch
 
 
 class Optimizer:
-    def __init__(self, method, lr, w1_size, w2_size, device_to_run):
+    def __init__(self, method, lr, w1_size, w2_size, update_both, device_to_run):
         self.method = method
         self.lr = lr
+        self.update_both = update_both
         # optim matrices
         self.A1 = torch.zeros(w1_size, device=device_to_run) # 784x512
         self.A2 = torch.zeros(w2_size, device=device_to_run) # 512x1
@@ -13,7 +14,8 @@ class Optimizer:
         self.eps = 1e-8
 
     def __updateWeights(self, deltaw1, deltaw2, w1, w2):
-        w1 -= deltaw1
+        if self.update_both:
+            w1 -= deltaw1
         w2 -= deltaw2
         return w1, w2
 

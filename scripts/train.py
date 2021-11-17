@@ -1,6 +1,7 @@
 import torch
 from .train_utils import AverageMeter, accuracy
-from .mnistParity import MNISTParity
+from .data import * 
+from torch.utils.data import TensorDataset, DataLoader
 
 
 def train_epoch(model, trainLoader, loss_fn, optimizer, loss_meter, performance_meter, performance, device,
@@ -62,18 +63,17 @@ def train_epoch_manually(model, trainLoader, loss_meter, performance_meter, perf
         loss = torch.nn.functional.cross_entropy(y_hat, y) if loss_type == "Cross Entropy" else loss_fn(y_hat, y.reshape(len(y), 1).float())
 
         acc = performance(y_hat, y, loss_type)
-        loss_meter.update(val=loss, n=X.shape[0])
+        loss_meter.update(val=loss.item(), n=X.shape[0])
         performance_meter.update(val=acc, n=X.shape[0])
         model.train_manually(X, y, t, momentum, nesterov_momentum, weight_decay, train_method, measure_alignment)
 
     if measure_alignment:
-        similarity_w2B, similarity_w1_grads, similarity_w2_grads = model.measureSimilarity()
-        print("W2.T and B similarity: {}, W1 gradient similarity {} and W2 gradient similarity {}".format(similarity_w2B, 
-                                                                                                       similarity_w1_grads, similarity_w2_grads))
+        similarity_w2B, similarity_w1_grads = model.measureSimilarity()
+        print("W2.T and B similarity: {}, W1 gradient similarity {}".format(similarity_w2B, similarity_w1_grads))
     else:
-        similarity_w2B, similarity_w1_grads, similarity_w2_grads = None, None, None
+        similarity_w2B, similarity_w1_grads = None, None
         
-    return similarity_w2B, similarity_w1_grads, similarity_w2_grads
+    return similarity_w2B, similarity_w1_grads
 
 
 def train_model(model, k, trainset, testset, loss_type, loss_fn, optimizer, num_epochs, batch_size, validate_model=False,
@@ -131,12 +131,13 @@ def train_model(model, k, trainset, testset, loss_type, loss_fn, optimizer, num_
 
 
 def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_epochs, batch_size, momentum, 
-                        nesterov_momentum, weight_decay, measure_alignment, performance=accuracy, validate_model=False, device=None):
+                        nesterov_momentum, weight_decay, measure_alignment, n=0, d=0, performance=accuracy, validate_model=False, device=None, data="parity"):
 
     if device is None:
         device = "cuda:0" if torch.cuda.is_available() else "cpu"
     print(f"Training on {device}")
     print(f"Training method {model.train_method} and optimizer {model.optim}")
+    print(f"Training both layers {model.update_both}")
     if model.train_method == "DFA":
         print(f"Random matrix initialization {model.B_initialization}")
 
@@ -148,21 +149,25 @@ def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_ep
     # alignment lists
     w2B = []
     w1grads = []
-    w2grads = []
 
+    if data != "parity":
+        trainLoader = DataLoader(TensorDataset(trainset[:n][0][:,:d], trainset[:n][1]), batch_size=batch_size, shuffle=True, num_workers=4)
+        testLoader = DataLoader(TensorDataset(testset[:4000][0][:,:d], testset[:4000][1]), batch_size=1000, shuffle=True, num_workers=4)
+    
     # trainData = MNISTParity(trainset, k, batch_size)
     # testData = MNISTParity(testset, k, batch_size)
     for epoch in range(num_epochs):
-        trainData = MNISTParity(trainset, k, batch_size)
+        if data == "parity":
+            trainData = MNISTParity(trainset, k, batch_size)
+            trainLoader = trainData.loader
         loss_meter = AverageMeter()
         performance_meter = AverageMeter()
 
-        similarity_w2B, similarity_w1_grads, similarity_w2_grads = train_epoch_manually(model, trainData.loader, loss_meter, performance_meter, performance, device, loss_fn,
+        similarity_w2B, similarity_w1_grads = train_epoch_manually(model, trainLoader, loss_meter, performance_meter, performance, device, loss_fn,
                              loss_type, epoch, momentum, nesterov_momentum, weight_decay, measure_alignment, model.train_method)
         
         w2B.append(similarity_w2B)
         w1grads.append(similarity_w1_grads)
-        w2grads.append(similarity_w2_grads)
         
         print(f"Epoch {epoch+1} completed. Loss - total: {loss_meter.sum:.4f} - average: {loss_meter.avg:.4f}; "
               f"Performance: {performance_meter.avg:.4f}")
@@ -170,15 +175,17 @@ def train_model_manually(model, k, trainset, testset, loss_type, loss_fn, num_ep
         trainAccList.append(performance_meter.avg)
 
         if validate_model is True:
-            testData = MNISTParity(testset, k, batch_size)
-            val_loss, val_perf = test_model_manually(model, testData.loader, device,
+            if data == "parity":
+                testData = MNISTParity(testset, k, batch_size)
+                testLoader = testData.loader
+            val_loss, val_perf = test_model_manually(model, testLoader, device,
                                                      loss_type, performance, loss_fn=loss_fn)
             valLossList.append(val_loss)
             valAccList.append(val_perf)
 
     model.setWeightsGradientsDefault()
 
-    return trainLostList, trainAccList, valLossList, valAccList, w2B, w1grads, w2grads
+    return trainLostList, trainAccList, valLossList, valAccList, w2B, w1grads
 
 
 def test_model(model, testLoader, loss_type, performance=accuracy, loss_fn=None, device=None):

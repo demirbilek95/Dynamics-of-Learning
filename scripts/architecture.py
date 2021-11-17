@@ -38,10 +38,10 @@ class MLP(torch.nn.Module):
 
 
 class MLPManual(torch.nn.Module):
-    def __init__(self, param_k, lr, losstype, train_method, B_initialization, optim, device, measure_alignment, getWeights=False):
+    def __init__(self, input_dim, lr, losstype, train_method, B_initialization, optim, device, measure_alignment, update_both=True, getWeights=False):
         super().__init__()
         self.device_to_run = device
-        self.input_dim = 28 * 28 * param_k
+        self.input_dim = input_dim
         self.hidden_dim = 512
         self.output_dim = 2 if losstype == "Cross Entropy" else 1
         self.flat = torch.nn.Flatten()
@@ -51,6 +51,7 @@ class MLPManual(torch.nn.Module):
         self.measure_alignment = measure_alignment
         self.optim = optim
         self.learning_rate = lr
+        self.update_both = update_both
 
         # initialize weights and gradients
         if getWeights:
@@ -66,7 +67,7 @@ class MLPManual(torch.nn.Module):
             self.w1_grads_BP, self.w2_grads_BP =  self.w1_grads.clone(), self.w2_grads.clone()
         
         self.B = self.initializeB(self.B_initialization) if train_method == "DFA" else None
-        self.optimizer = Optimizer(self.optim, self.learning_rate, self.w1.size(), self.w2.size(), self.device_to_run)
+        self.optimizer = Optimizer(self.optim, self.learning_rate, self.w1.size(), self.w2.size(), self.update_both, self.device_to_run)
 
     def initializeWeights(self):
         # initialize the weights as pytorch does by default
@@ -152,15 +153,10 @@ class MLPManual(torch.nn.Module):
         self.w1, self.w2 = self.optimizer.updateParameters(t, self.w1, self.w2, self.w1_grads, self.w2_grads, momentum, nesterov_momentum, weight_decay)
 
         if measure_alignment:
-            y_hat_BP, a1_BP, h1_BP = self.forward(X, self.w1_BP, self.w2_BP)
-            self.w1_grads_BP, self.w2_grads_BP = self.backward(X, y, y_hat_BP, h1_BP, a1_BP, self.w2_BP, None, "BP")
-            self.w1_BP, self.w2_BP = self.optimizer.updateParameters(t, self.w1_BP, self.w2_BP, self.w1_grads_BP, self.w2_grads_BP, momentum, nesterov_momentum, 
-                                                                    weight_decay)
+            self.w1_grads_BP, self.w2_grads_BP = self.backward(X, y, y_hat, h1, a1, self.w2, None, "BP")
 
     def measureSimilarity(self):
         cos = torch.nn.CosineSimilarity()
         similarity_w2B = cos(self.B, self.w2.t()).mean().item()
-
         similarity_w1_grads = cos(self.w1_grads, self.w1_grads_BP ).mean().item()
-        similarity_w2_grads = cos(self.w2_grads, self.w2_grads_BP).mean().item()
-        return similarity_w2B, similarity_w1_grads, similarity_w2_grads
+        return similarity_w2B, similarity_w1_grads
