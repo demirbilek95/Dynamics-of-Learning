@@ -20,3 +20,7 @@ scripts/__pycache__/train.cpython-38.pyc
 .idea/vcs.xml
 .idea/inspectionProfiles/profiles_settings.xml
 .idea/.gitignore
+scripts/architecture.py
+scripts/__pycache__/data.cpython-38.pyc
+scripts/__pycache__/notebook_utils.cpython-38.pyc
+scripts/__pycache__/optimizer.cpython-38.pyc
