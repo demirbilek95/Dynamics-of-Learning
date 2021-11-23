@@ -64,7 +64,8 @@ class Optimizer:
         w1, w2 = self.__updateWeights(deltaw1, deltaw2, w1, w2)
         return w1, w2
 
-    def __Adadelta(self, w1, w2, w1_grads, w2_grads, gamma=0.9, weight_decay = None):
+    def __Adadelta(self, w1, w2, w1_grads, w2_grads, weight_decay = None):
+        gamma=0.9
         if weight_decay:
             w1_grads += weight_decay * w1
             w2_grads += weight_decay * w2
@@ -81,7 +82,8 @@ class Optimizer:
         self.B2 = gamma * self.B2 + (1-gamma) * torch.square(deltaw2)
         return w1, w2
 
-    def __RMSProp(self, w1, w2, w1_grads, w2_grads, gamma=0.9, weight_decay = None):
+    def __RMSProp(self, w1, w2, w1_grads, w2_grads, weight_decay = None):
+        gamma=0.9
         if weight_decay:
             w1_grads += weight_decay * w1
             w2_grads += weight_decay * w2
@@ -93,7 +95,8 @@ class Optimizer:
         w1, w2 = self.__updateWeights(deltaw1, deltaw2, w1, w2)
         return w1, w2
 
-    def __Adam(self, t, w1, w2, w1_grads, w2_grads, beta1=0.9, beta2=0.999, weight_decay = None):
+    def __Adam(self, t, w1, w2, w1_grads, w2_grads, weight_decay = None):
+        beta1, beta2 = 0.9,0.999
         if weight_decay:
             w1_grads += weight_decay * w1
             w2_grads += weight_decay * w2
