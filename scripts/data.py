@@ -60,7 +60,7 @@ def cluster_center(p ,k):
     x2 = Delta * (1 + 3*(p2-1)) - 1/2
     return x1, x2
 
-def randomData(k, n, n_test, sd):
+def syntheticData(k, n, n_test, sd):
     Delta = 1/(3*k-1) # interclass distance
     A = torch.ones(k**2) # cluster affectation
     A[torch.randperm(k**2)[0:torch.div(k**2,2, rounding_mode="trunc")]] = 0  

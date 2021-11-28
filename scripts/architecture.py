@@ -42,7 +42,7 @@ class MLPManual(torch.nn.Module):
         super().__init__()
         self.device_to_run = device
         self.input_dim = input_dim
-        self.hidden_dim = 512
+        self.hidden_dim = 256
         self.output_dim = 2 if losstype == "Cross Entropy" else 1
         self.flat = torch.nn.Flatten()
         self.losstype = losstype
