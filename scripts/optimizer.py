@@ -1,6 +1,6 @@
 import torch
 
-
+# for this class, this source is also used https://d2l.ai
 class Optimizer:
     def __init__(self, method, lr, w1_size, w2_size, update_both, device_to_run):
         self.method = method
@@ -44,6 +44,8 @@ class Optimizer:
             self.A2 = momentum * self.A2 + self.lr * w2_grads
             w1, w2 = self.__updateWeights(self.A1, self.A2, w1, w2)
         elif nesterov_momentum:
+            # This implementation is wrong, however they are not used in the experiments with momentum
+            # fixing this is left for future
             self.A1 = nesterov_momentum * self.A1 + self.lr * (w1_grads - nesterov_momentum * self.A1)
             self.A2 = nesterov_momentum * self.A2 + self.lr * (w2_grads - nesterov_momentum * self.A2)
             w1, w2 = self.__updateWeights(self.A1, self.A2, w1, w2)
