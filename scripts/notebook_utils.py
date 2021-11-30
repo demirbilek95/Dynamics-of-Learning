@@ -36,7 +36,7 @@ def tuneLearningRate_Torch(lr_array : np.array, optim: str, k:int, loss_type, lo
     print("Best learning rate is: ", best_lr)
     return best_lr
 
-def tuneLearningRate_Manual(lr_array : np.array, training_method: str, init_B: str, optim: str, k:int, loss_type, loss_fn, device, num_epoch, weight_decay):
+def tuneLearningRate_Manual(lr_array : np.array, training_method: str, init_B: str, optim: str, k:int, trainset, testset, loss_type, loss_fn, device, num_epoch, weight_decay):
     listofValAcc = []
     for learning_rate in lr_array:
         print(f"Learning rate: {learning_rate}")
