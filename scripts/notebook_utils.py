@@ -12,15 +12,15 @@ transforms = Compose([
 trainset = torchvision.datasets.MNIST(root='data', train=True, download=True, transform=transforms)
 testset = torchvision.datasets.MNIST(root='data', train=False, download=True, transform=transforms)
 
-def tuneLearningRate_Torch(lr_array : np.array, optim: str, k:int, loss_type, loss_fn, device, batch_size, num_epochs, weight_decay):
+def tuneLearningRate_Torch(lr_array : np.array, optim: str, k:int, trainset, testset, loss_type, loss_fn, device, batch_size, num_epochs):
     listofValAcc = []
     for learning_rate in lr_array:
         print(f"Learning rate: {learning_rate}")
         model = MLP(k, "BP", loss_type)
         if optim == "SGD":
-            optimizer = torch.optim.SGD(model.parameters(), lr = learning_rate, weight_decay=weight_decay)
+            optimizer = torch.optim.SGD(model.parameters(), lr = learning_rate)
         else:
-            optimizer = torch.optim.Adadelta(model.parameters(), lr=learning_rate, weight_decay = weight_decay)
+            optimizer = torch.optim.Adadelta(model.parameters(), lr=learning_rate)
 
         trainLostListLoc, trainAccListLoc, valLossListLoc, valAccListLoc  = train_model(model, k, trainset, testset, loss_type, loss_fn, optimizer, num_epochs, 
                                                                                         batch_size, validate_model = True, performance=accuracy, device=device, 
