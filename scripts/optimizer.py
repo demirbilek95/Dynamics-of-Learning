@@ -19,23 +19,26 @@ class Optimizer:
         w2 -= deltaw2
         return w1, w2
 
-    def updateParameters(self, t, w1, w2, w1_grads, w2_grads, momentum, nesterov_momentum, weight_decay=None):
+    def updateParameters(self, t, w1, w2, w1_grads, w2_grads, momentum, nesterov_momentum, weight_decay):
+        # TODO: Parameterize these variables
+        gamma = 0.9
+        beta2 = 0.999
         if self.method == "SGD":
-            w1, w2 = self.__SGD(w1, w2, w1_grads, w2_grads, momentum, nesterov_momentum, weight_decay)
+            w1, w2 = self.__SGD(w1, w2, w1_grads, w2_grads, weight_decay, momentum, nesterov_momentum)
         elif self.method == "Adagrad":
             w1, w2 = self.__Adagrad(w1, w2, w1_grads, w2_grads, weight_decay)
         elif self.method == "Adadelta":
-            w1, w2 = self.__Adadelta(w1, w2, w1_grads, w2_grads, weight_decay)
+            w1, w2 = self.__Adadelta(w1, w2, w1_grads, w2_grads, weight_decay, gamma)
         elif self.method == "RMSProp":
-            w1, w2 = self.__RMSProp(w1, w2, w1_grads, w2_grads, weight_decay)
+            w1, w2 = self.__RMSProp(w1, w2, w1_grads, w2_grads, weight_decay, gamma)
         elif self.method == "Adam":
-            w1, w2 = self.__Adam(t, w1, w2, w1_grads, w2_grads, weight_decay)
+            w1, w2 = self.__Adam(t, w1, w2, w1_grads, w2_grads, weight_decay, gamma, beta2)
         else:
             raise NotImplementedError
 
         return w1, w2
 
-    def __SGD(self, w1, w2, w1_grads, w2_grads, momentum=0.9, nesterov_momentum=0.9, weight_decay = None):
+    def __SGD(self, w1, w2, w1_grads, w2_grads, weight_decay, momentum, nesterov_momentum):
         if weight_decay:
             w1_grads += weight_decay * w1
             w2_grads += weight_decay * w2
@@ -44,7 +47,7 @@ class Optimizer:
             self.A2 = momentum * self.A2 + self.lr * w2_grads
             w1, w2 = self.__updateWeights(self.A1, self.A2, w1, w2)
         elif nesterov_momentum:
-            # This implementation is wrong, however they are not used in the experiments with momentum
+            # TODO: This implementation is wrong, however they are not used in the experiments with momentum
             # fixing this is left for future
             self.A1 = nesterov_momentum * self.A1 + self.lr * (w1_grads - nesterov_momentum * self.A1)
             self.A2 = nesterov_momentum * self.A2 + self.lr * (w2_grads - nesterov_momentum * self.A2)
@@ -55,7 +58,7 @@ class Optimizer:
             w1, w2 = self.__updateWeights(deltaw1, deltaw2, w1, w2)
         return w1, w2
 
-    def __Adagrad(self, w1, w2, w1_grads, w2_grads, weight_decay = None):
+    def __Adagrad(self, w1, w2, w1_grads, w2_grads, weight_decay):
         if weight_decay:
             w1_grads += weight_decay * w1
             w2_grads += weight_decay * w2
@@ -66,7 +69,7 @@ class Optimizer:
         w1, w2 = self.__updateWeights(deltaw1, deltaw2, w1, w2)
         return w1, w2
 
-    def __Adadelta(self, w1, w2, w1_grads, w2_grads, gamma=0.9, weight_decay = None):
+    def __Adadelta(self, w1, w2, w1_grads, w2_grads, weight_decay, gamma):
         if weight_decay:
             w1_grads += weight_decay * w1
             w2_grads += weight_decay * w2
@@ -83,7 +86,7 @@ class Optimizer:
         self.B2 = gamma * self.B2 + (1-gamma) * torch.square(deltaw2)
         return w1, w2
 
-    def __RMSProp(self, w1, w2, w1_grads, w2_grads, gamma=0.9, weight_decay = None):
+    def __RMSProp(self, w1, w2, w1_grads, w2_grads, weight_decay, gamma ):
         if weight_decay:
             w1_grads += weight_decay * w1
             w2_grads += weight_decay * w2
@@ -95,7 +98,7 @@ class Optimizer:
         w1, w2 = self.__updateWeights(deltaw1, deltaw2, w1, w2)
         return w1, w2
 
-    def __Adam(self, t, w1, w2, w1_grads, w2_grads, beta1=0.9, beta2=0.999, weight_decay = None):
+    def __Adam(self, t, w1, w2, w1_grads, w2_grads, weight_decay, beta1, beta2):
         if weight_decay:
             w1_grads += weight_decay * w1
             w2_grads += weight_decay * w2
