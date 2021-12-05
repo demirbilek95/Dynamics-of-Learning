@@ -15,4 +15,4 @@ All of the experiments are stochastic. Setting a seed may influence the performa
 	* [optimizer](scripts/optimizer.py) includes the various optimizer algorithms that are used by the networks.
 	* [train](scripts/train.py) and [train_utils](scripts/train_utils.py) includes the reusable functions to train and test the networks.
 * [01-Parity Experiments](01-Parity_Experiments.ipynb) contains the code that are used to produce `MNIST Parity` Experiments.
-* [02-Random Data Experiments](02-Random_Data_Experiments.ipynb) contains the code that are used to produce `Random Data` Experiments.
+* [02-Synthetic Data Experiments](02-Synthetic_Data_Experiments.ipynb) contains the code that are used to produce `Synthetic Data` Experiments.
