@@ -31,7 +31,10 @@ def plotValAccuracy(val_acc, num_epochs, label, k):
 def fillSubplot(val_acc, num_epochs, label, ax, title):
     ax.plot(range(1, num_epochs+1), val_acc, label=label)
     ax.set_ylim(0.45, 1)
-    ax.set_xticks(range(1,21))
+    xvalues = range(1,21)
+    ax.set_xticks(xvalues)
     ax.set_title(title, fontsize = 25)
-    ax.legend()
+    ax.set_xticklabels(xvalues, fontsize = 12, rotation=90)
+    legend = ax.legend()
+    legend.set_title("Learning Rate")
     ax.grid(b=True)
