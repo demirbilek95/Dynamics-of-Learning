@@ -1,6 +1,6 @@
 # The Dynamics of Learning Beyond Stochastic Gradient Descent
 
-This repository contains the code used to obtain the experiment results of the thesis (the title is above). For the writing of the thesis, please check [this repository](https://github.com/demirbilek95/oxforddown) (not completed yet).
+This repository contains the code used to obtain the experiment results of the thesis (the title is above). For the writing of the thesis, please check [this repository](https://github.com/demirbilek95/thesis_writing).
 All of the experiments are stochastic. Setting a seed may influence the performance because the training phase takes benefit of this stochasticity. However, the results should be around the vicinity of the ones reported in the writings.
 
 ## Structure of the Repository
